@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,11 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface AuthFormProps {
-  onAuth: (data: AuthData) => void;
+  onAuth: (data: AuthFormData) => void;
   isLoading?: boolean;
 }
 
-interface AuthData {
+interface AuthFormData {
   email: string;
   password: string;
   name?: string;

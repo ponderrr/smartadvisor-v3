@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import RecommendationCard from '@/components/recommendation/RecommendationCard';
-import { recommendationService, type Recommendation } from '@/services/supabaseRecommendations';
+import { recommendationService, type RecommendationItem } from '@/services/supabaseRecommendations';
 
 interface HistoryProps {
   user: {
@@ -15,7 +14,7 @@ interface HistoryProps {
 }
 
 const History = ({ user, onBack }: HistoryProps) => {
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [recommendations, setRecommendations] = useState<RecommendationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {

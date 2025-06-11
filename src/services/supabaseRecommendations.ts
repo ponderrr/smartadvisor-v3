@@ -1,7 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-export interface Recommendation {
+export interface RecommendationItem {
   id: string;
   type: 'movie' | 'book';
   title: string;
@@ -21,11 +21,11 @@ class SupabaseRecommendationService {
     contentType: 'movie' | 'book' | 'both',
     answers: Record<string, string>,
     userAge: number
-  ): Promise<Recommendation[]> {
+  ): Promise<RecommendationItem[]> {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    const recommendations: Recommendation[] = [];
+    const recommendations: RecommendationItem[] = [];
     
     if (contentType === 'movie' || contentType === 'both') {
       recommendations.push({
@@ -62,7 +62,7 @@ class SupabaseRecommendationService {
     return recommendations;
   }
 
-  async saveRecommendation(userId: string, recommendation: Recommendation): Promise<void> {
+  async saveRecommendation(userId: string, recommendation: RecommendationItem): Promise<void> {
     const { error } = await supabase
       .from('recommendations')
       .insert({
@@ -82,7 +82,7 @@ class SupabaseRecommendationService {
     }
   }
 
-  async getUserRecommendations(userId: string): Promise<Recommendation[]> {
+  async getUserRecommendations(userId: string): Promise<RecommendationItem[]> {
     const { data, error } = await supabase
       .from('recommendations')
       .select('*')
@@ -133,4 +133,3 @@ class SupabaseRecommendationService {
 }
 
 export const recommendationService = new SupabaseRecommendationService();
-export type { Recommendation };

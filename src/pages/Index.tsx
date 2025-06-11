@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { authService, type User, type AuthData } from '@/services/supabaseAuth';
-import { recommendationService, type Recommendation } from '@/services/supabaseRecommendations';
+import { authService, type AuthUser, type AuthFormData } from '@/services/supabaseAuth';
+import { recommendationService, type RecommendationItem } from '@/services/supabaseRecommendations';
 import { toast } from '@/hooks/use-toast';
 
 // Components
@@ -15,10 +15,10 @@ import History from './History';
 type AppState = 'auth' | 'dashboard' | 'content-select' | 'questionnaire' | 'results' | 'history';
 
 const Index = () => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [appState, setAppState] = useState<AppState>('auth');
   const [contentType, setContentType] = useState<'movie' | 'book' | 'both'>('movie');
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [recommendations, setRecommendations] = useState<RecommendationItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
 
@@ -56,7 +56,7 @@ const Index = () => {
     };
   }, []);
 
-  const handleAuth = async (authData: AuthData) => {
+  const handleAuth = async (authData: AuthFormData) => {
     setIsLoading(true);
     try {
       const user = await authService.authenticate(authData);

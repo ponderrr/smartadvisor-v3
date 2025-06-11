@@ -1,14 +1,14 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-export interface User {
+export interface AuthUser {
   id: string;
   email: string;
   name: string;
   age: number;
 }
 
-export interface AuthData {
+export interface AuthFormData {
   email: string;
   password: string;
   name?: string;
@@ -17,7 +17,7 @@ export interface AuthData {
 }
 
 class SupabaseAuthService {
-  async signIn(email: string, password: string): Promise<User> {
+  async signIn(email: string, password: string): Promise<AuthUser> {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -50,7 +50,7 @@ class SupabaseAuthService {
     };
   }
 
-  async signUp(email: string, password: string, name: string, age: number): Promise<User> {
+  async signUp(email: string, password: string, name: string, age: number): Promise<AuthUser> {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -78,7 +78,7 @@ class SupabaseAuthService {
     };
   }
 
-  async authenticate(authData: AuthData): Promise<User> {
+  async authenticate(authData: AuthFormData): Promise<AuthUser> {
     if (authData.isSignUp) {
       if (!authData.name || !authData.age) {
         throw new Error('Name and age are required for sign up');
@@ -96,7 +96,7 @@ class SupabaseAuthService {
     }
   }
 
-  async getCurrentUser(): Promise<User | null> {
+  async getCurrentUser(): Promise<AuthUser | null> {
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
@@ -123,7 +123,7 @@ class SupabaseAuthService {
     };
   }
 
-  onAuthStateChange(callback: (user: User | null) => void) {
+  onAuthStateChange(callback: (user: AuthUser | null) => void) {
     return supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         const user = await this.getCurrentUser();
@@ -136,4 +136,3 @@ class SupabaseAuthService {
 }
 
 export const authService = new SupabaseAuthService();
-export type { User, AuthData };
