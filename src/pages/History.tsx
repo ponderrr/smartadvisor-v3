@@ -3,11 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import RecommendationCard from '@/components/recommendation/RecommendationCard';
-import { recommendationService, type Recommendation } from '@/services/mockRecommendations';
+import { recommendationService, type Recommendation } from '@/services/supabaseRecommendations';
 
 interface HistoryProps {
   user: {
-    id?: string;
+    id: string;
     name: string;
     email: string;
   };
@@ -21,7 +21,7 @@ const History = ({ user, onBack }: HistoryProps) => {
   useEffect(() => {
     const loadHistory = async () => {
       try {
-        const history = await recommendationService.getUserRecommendations(user.id || '1');
+        const history = await recommendationService.getUserRecommendations(user.id);
         setRecommendations(history);
       } catch (error) {
         console.error('Failed to load history:', error);
@@ -35,7 +35,7 @@ const History = ({ user, onBack }: HistoryProps) => {
 
   const handleToggleFavorite = async (recommendationId: string) => {
     try {
-      await recommendationService.toggleFavorite(user.id || '1', recommendationId);
+      await recommendationService.toggleFavorite(user.id, recommendationId);
       setRecommendations(prev => 
         prev.map(rec => 
           rec.id === recommendationId 

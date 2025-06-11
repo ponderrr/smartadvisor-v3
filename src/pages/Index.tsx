@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
-import { authService, type User, type AuthData } from '@/services/mockAuth';
-import { recommendationService, type Recommendation } from '@/services/mockRecommendations';
+import { authService, type User, type AuthData } from '@/services/supabaseAuth';
+import { recommendationService, type Recommendation } from '@/services/supabaseRecommendations';
 import { toast } from '@/hooks/use-toast';
 
 // Components
@@ -21,13 +20,40 @@ const Index = () => {
   const [contentType, setContentType] = useState<'movie' | 'book' | 'both'>('movie');
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
-    const currentUser = authService.getCurrentUser();
-    if (currentUser) {
-      setUser(currentUser);
-      setAppState('dashboard');
-    }
+    // Check for existing session
+    const initializeAuth = async () => {
+      try {
+        const currentUser = await authService.getCurrentUser();
+        if (currentUser) {
+          setUser(currentUser);
+          setAppState('dashboard');
+        }
+      } catch (error) {
+        console.error('Failed to initialize auth:', error);
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    initializeAuth();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = authService.onAuthStateChange((user) => {
+      setUser(user);
+      if (user) {
+        setAppState('dashboard');
+      } else {
+        setAppState('auth');
+        setRecommendations([]);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleAuth = async (authData: AuthData) => {
@@ -51,15 +77,23 @@ const Index = () => {
     }
   };
 
-  const handleSignOut = () => {
-    authService.signOut();
-    setUser(null);
-    setAppState('auth');
-    setRecommendations([]);
-    toast({
-      title: "Signed out",
-      description: "You've been successfully signed out",
-    });
+  const handleSignOut = async () => {
+    try {
+      await authService.signOut();
+      setUser(null);
+      setAppState('auth');
+      setRecommendations([]);
+      toast({
+        title: "Signed out",
+        description: "You've been successfully signed out",
+      });
+    } catch (error) {
+      toast({
+        title: "Sign out failed",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleStartRecommendation = () => {
@@ -144,6 +178,15 @@ const Index = () => {
       });
     }
   };
+
+  // Show loading state during initialization
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   // Render authentication form if user is not logged in
   if (!user) {
