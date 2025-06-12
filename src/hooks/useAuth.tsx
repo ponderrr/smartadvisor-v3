@@ -3,14 +3,16 @@ import { useState, useEffect, createContext, useContext, ReactNode } from 'react
 import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@/types/User';
+import { authService } from '@/services/auth';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, name: string, age: number) => Promise<{ error: any }>;
-  signOut: () => Promise<void>;
+  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, name: string, age: number) => Promise<{ error: string | null }>;
+  signOut: () => Promise<{ error: string | null }>;
+  updateProfile: (name: string, age: number) => Promise<{ error: string | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,6 +26,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.id);
         setSession(session);
         
         if (session?.user) {
@@ -64,32 +67,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { error } = await authService.signIn(email, password);
     return { error };
   };
 
   const signUp = async (email: string, password: string, name: string, age: number) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          name,
-          age,
-        },
-      },
-    });
+    const { error } = await authService.signUp(email, password, name, age);
     return { error };
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    const { error } = await authService.signOut();
+    if (!error) {
+      setUser(null);
+      setSession(null);
+    }
+    return { error };
+  };
+
+  const updateProfile = async (name: string, age: number) => {
+    const { error } = await authService.updateProfile({ name, age });
+    if (!error && user) {
+      setUser({ ...user, name, age });
+    }
+    return { error };
   };
 
   return (
@@ -100,6 +101,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       signIn,
       signUp,
       signOut,
+      updateProfile,
     }}>
       {children}
     </AuthContext.Provider>
