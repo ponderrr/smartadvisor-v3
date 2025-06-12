@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { RefreshCw, Heart, User, LogOut, Star } from "lucide-react";
@@ -21,7 +20,7 @@ const ResultsPage = () => {
   useEffect(() => {
     // Redirect if no data
     if (!contentType || !answers) {
-      navigate('/content-selection');
+      navigate("/content-selection");
       return;
     }
 
@@ -30,12 +29,12 @@ const ResultsPage = () => {
       try {
         setLoading(true);
         // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
         const recs = await generateMockRecommendations(contentType);
         setRecommendations(recs);
       } catch (error) {
-        console.error('Error generating recommendations:', error);
+        console.error("Error generating recommendations:", error);
       } finally {
         setLoading(false);
       }
@@ -54,11 +53,11 @@ const ResultsPage = () => {
   };
 
   const handleGetAnother = () => {
-    navigate('/content-selection');
+    navigate("/content-selection");
   };
 
   const handleViewHistory = () => {
-    navigate('/history');
+    navigate("/history");
   };
 
   const toggleFavorite = (recommendationId: string) => {
@@ -106,7 +105,8 @@ const ResultsPage = () => {
               Generating Your Recommendations
             </h1>
             <p className="text-lg text-textSecondary">
-              Our AI is analyzing your preferences to find the perfect {contentType} for you...
+              Our AI is analyzing your preferences to find the perfect{" "}
+              {contentType} for you...
             </p>
           </div>
         </main>
@@ -138,7 +138,7 @@ const ResultsPage = () => {
               Hi, {user?.name}
             </span>
           </button>
-          
+
           {showUserMenu && (
             <div className="absolute right-0 top-full mt-2 w-48 bg-appSecondary border border-gray-700 rounded-lg shadow-lg z-50">
               <button
@@ -163,7 +163,9 @@ const ResultsPage = () => {
       {/* Main Content */}
       <main className="px-6 pt-[80px] md:pt-[120px] pb-[100px]">
         {/* Progress Indicator */}
-        <div className="text-center text-textTertiary text-sm mb-8">Step 3 of 3</div>
+        <div className="text-center text-textTertiary text-sm mb-8">
+          Step 3 of 3
+        </div>
 
         {/* Title */}
         <div className="text-center mb-12">
@@ -201,9 +203,13 @@ const ResultsPage = () => {
               <div className="flex-1">
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h2 className="text-2xl font-bold text-textPrimary mb-2">{rec.title}</h2>
+                    <h2 className="text-2xl font-bold text-textPrimary mb-2">
+                      {rec.title}
+                    </h2>
                     {rec.director && (
-                      <p className="text-textSecondary">Directed by {rec.director}</p>
+                      <p className="text-textSecondary">
+                        Directed by {rec.director}
+                      </p>
                     )}
                     {rec.author && (
                       <p className="text-textSecondary">By {rec.author}</p>
@@ -216,11 +222,14 @@ const ResultsPage = () => {
                     onClick={() => toggleFavorite(rec.id)}
                     className={`p-2 rounded-full transition-colors duration-200 ${
                       favorites.has(rec.id)
-                        ? 'bg-red-500 text-white'
-                        : 'bg-gray-700 text-textSecondary hover:text-red-500'
+                        ? "bg-red-500 text-white"
+                        : "bg-gray-700 text-textSecondary hover:text-red-500"
                     }`}
                   >
-                    <Heart size={20} fill={favorites.has(rec.id) ? 'currentColor' : 'none'} />
+                    <Heart
+                      size={20}
+                      fill={favorites.has(rec.id) ? "currentColor" : "none"}
+                    />
                   </button>
                 </div>
 
@@ -228,14 +237,16 @@ const ResultsPage = () => {
                 {rec.rating && (
                   <div className="flex items-center gap-2 mb-4">
                     <Star className="w-5 h-5 text-yellow-500 fill-current" />
-                    <span className="text-textPrimary font-medium">{rec.rating}</span>
+                    <span className="text-textPrimary font-medium">
+                      {rec.rating}
+                    </span>
                   </div>
                 )}
 
                 {/* Genres */}
-                {rec.genre && rec.genre.length > 0 && (
+                {rec.genres && rec.genres.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {rec.genre.map((g) => (
+                    {rec.genres.map((g) => (
                       <span
                         key={g}
                         className="px-3 py-1 bg-appAccent text-white text-sm rounded-full"
@@ -247,14 +258,16 @@ const ResultsPage = () => {
                 )}
 
                 {/* Description */}
-                {rec.description && (
-                  <p className="text-textSecondary mb-4">{rec.description}</p>
+                {rec.explanation && (
+                  <p className="text-textSecondary mb-4">{rec.explanation}</p>
                 )}
 
                 {/* AI Explanation */}
                 {rec.explanation && (
                   <div className="bg-appPrimary border border-gray-600 rounded-lg p-4">
-                    <h3 className="text-textPrimary font-semibold mb-2">Why we recommend this:</h3>
+                    <h3 className="text-textPrimary font-semibold mb-2">
+                      Why we recommend this:
+                    </h3>
                     <p className="text-textSecondary">{rec.explanation}</p>
                   </div>
                 )}

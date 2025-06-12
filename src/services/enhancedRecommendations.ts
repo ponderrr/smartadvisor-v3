@@ -1,14 +1,13 @@
-
-import { Recommendation } from '@/types/Recommendation';
-import { Answer } from '@/types/Answer';
-import { openaiService } from './openai';
-import { tmdbService } from './tmdb';
-import { googleBooksService } from './googleBooks';
-import { recommendationsService } from './recommendations';
+import { Recommendation } from "@/types/Recommendation";
+import { Answer } from "@/types/Answer";
+import { openaiService } from "./openai";
+import { tmdbService } from "./tmdb";
+import { googleBooksService } from "./googleBooks";
+import { recommendationsService } from "./recommendations";
 
 export interface QuestionnaireData {
   answers: Answer[];
-  contentType: 'movie' | 'book' | 'both';
+  contentType: "movie" | "book" | "both";
   userAge: number;
 }
 
@@ -32,13 +31,13 @@ class EnhancedRecommendationsService {
       // 2. Process movie recommendation
       if (aiRecommendations.movieRecommendation) {
         const movieRec = aiRecommendations.movieRecommendation;
-        
+
         // Enhance with TMDB data
         const tmdbData = await tmdbService.searchMovie(movieRec.title);
-        
-        const movieRecommendation: Omit<Recommendation, 'id' | 'created_at'> = {
+
+        const movieRecommendation: Omit<Recommendation, "id" | "created_at"> = {
           user_id: userId,
-          type: 'movie',
+          type: "movie",
           title: movieRec.title,
           director: movieRec.director,
           author: undefined,
@@ -52,17 +51,9 @@ class EnhancedRecommendationsService {
         };
 
         // Save to Supabase
-        const { error } = await recommendationsService.saveRecommendation(userId, {
-          type: movieRecommendation.type,
-          title: movieRecommendation.title,
-          director: movieRecommendation.director,
-          year: movieRecommendation.year,
-          rating: movieRecommendation.rating,
-          genres: movieRecommendation.genres,
-          poster_url: movieRecommendation.poster_url,
-          explanation: movieRecommendation.explanation,
-          content_type: movieRecommendation.content_type,
-        });
+        const { error } = await recommendationsService.saveRecommendation(
+          movieRecommendation
+        );
 
         if (!error) {
           recommendations.push({
@@ -76,13 +67,16 @@ class EnhancedRecommendationsService {
       // 3. Process book recommendation
       if (aiRecommendations.bookRecommendation) {
         const bookRec = aiRecommendations.bookRecommendation;
-        
+
         // Enhance with Google Books data
-        const booksData = await googleBooksService.searchBook(bookRec.title, bookRec.author);
-        
-        const bookRecommendation: Omit<Recommendation, 'id' | 'created_at'> = {
+        const booksData = await googleBooksService.searchBook(
+          bookRec.title,
+          bookRec.author
+        );
+
+        const bookRecommendation: Omit<Recommendation, "id" | "created_at"> = {
           user_id: userId,
-          type: 'book',
+          type: "book",
           title: bookRec.title,
           director: undefined,
           author: bookRec.author,
@@ -96,17 +90,9 @@ class EnhancedRecommendationsService {
         };
 
         // Save to Supabase
-        const { error } = await recommendationsService.saveRecommendation(userId, {
-          type: bookRecommendation.type,
-          title: bookRecommendation.title,
-          author: bookRecommendation.author,
-          year: bookRecommendation.year,
-          rating: bookRecommendation.rating,
-          genres: bookRecommendation.genres,
-          poster_url: bookRecommendation.poster_url,
-          explanation: bookRecommendation.explanation,
-          content_type: bookRecommendation.content_type,
-        });
+        const { error } = await recommendationsService.saveRecommendation(
+          bookRecommendation
+        );
 
         if (!error) {
           recommendations.push({
@@ -119,8 +105,8 @@ class EnhancedRecommendationsService {
 
       return recommendations;
     } catch (error) {
-      console.error('Error generating full recommendation:', error);
-      throw new Error('Failed to generate recommendations');
+      console.error("Error generating full recommendation:", error);
+      throw new Error("Failed to generate recommendations");
     }
   }
 
@@ -137,10 +123,12 @@ class EnhancedRecommendationsService {
       } catch (error) {
         lastError = error;
         console.log(`Retry attempt ${i + 1} failed:`, error);
-        
+
         // Wait before retrying (exponential backoff)
         if (i < retryCount - 1) {
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+          await new Promise((resolve) =>
+            setTimeout(resolve, Math.pow(2, i) * 1000)
+          );
         }
       }
     }
@@ -149,4 +137,5 @@ class EnhancedRecommendationsService {
   }
 }
 
-export const enhancedRecommendationsService = new EnhancedRecommendationsService();
+export const enhancedRecommendationsService =
+  new EnhancedRecommendationsService();

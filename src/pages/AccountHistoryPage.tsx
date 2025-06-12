@@ -1,9 +1,11 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Heart, Star, User, LogOut, Settings } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { getUserRecommendations, toggleFavorite } from "@/services/recommendations";
+import {
+  getUserRecommendations,
+  toggleFavorite,
+} from "@/services/recommendations";
 import { Recommendation } from "@/types/Recommendation";
 
 const AccountHistoryPage = () => {
@@ -12,19 +14,21 @@ const AccountHistoryPage = () => {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'movies' | 'books' | 'favorites'>('all');
+  const [filter, setFilter] = useState<
+    "all" | "movies" | "books" | "favorites"
+  >("all");
 
   useEffect(() => {
     const loadRecommendations = async () => {
       try {
         const { data, error } = await getUserRecommendations();
         if (error) {
-          console.error('Error loading recommendations:', error);
+          console.error("Error loading recommendations:", error);
         } else {
           setRecommendations(data);
         }
       } catch (error) {
-        console.error('Error loading recommendations:', error);
+        console.error("Error loading recommendations:", error);
       } finally {
         setLoading(false);
       }
@@ -43,7 +47,7 @@ const AccountHistoryPage = () => {
   };
 
   const handleGetNewRecommendation = () => {
-    navigate('/content-selection');
+    navigate("/content-selection");
   };
 
   const handleToggleFavorite = async (recommendationId: string) => {
@@ -51,26 +55,26 @@ const AccountHistoryPage = () => {
       const { error } = await toggleFavorite(recommendationId);
       if (!error) {
         // Update local state
-        setRecommendations(recs => 
-          recs.map(rec => 
-            rec.id === recommendationId 
+        setRecommendations((recs) =>
+          recs.map((rec) =>
+            rec.id === recommendationId
               ? { ...rec, is_favorited: !rec.is_favorited }
               : rec
           )
         );
       }
     } catch (error) {
-      console.error('Error toggling favorite:', error);
+      console.error("Error toggling favorite:", error);
     }
   };
 
-  const filteredRecommendations = recommendations.filter(rec => {
+  const filteredRecommendations = recommendations.filter((rec) => {
     switch (filter) {
-      case 'movies':
-        return rec.type === 'movie';
-      case 'books':
-        return rec.type === 'book';
-      case 'favorites':
+      case "movies":
+        return rec.type === "movie";
+      case "books":
+        return rec.type === "book";
+      case "favorites":
         return rec.is_favorited;
       default:
         return true;
@@ -101,7 +105,7 @@ const AccountHistoryPage = () => {
               Hi, {user?.name}
             </span>
           </button>
-          
+
           {showUserMenu && (
             <div className="absolute right-0 top-full mt-2 w-48 bg-appSecondary border border-gray-700 rounded-lg shadow-lg z-50">
               <button
@@ -140,18 +144,18 @@ const AccountHistoryPage = () => {
         {/* Filter Tabs */}
         <div className="flex gap-4 mb-8 overflow-x-auto">
           {[
-            { key: 'all', label: 'All' },
-            { key: 'movies', label: 'Movies' },
-            { key: 'books', label: 'Books' },
-            { key: 'favorites', label: 'Favorites' }
+            { key: "all", label: "All" },
+            { key: "movies", label: "Movies" },
+            { key: "books", label: "Books" },
+            { key: "favorites", label: "Favorites" },
           ].map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setFilter(key as any)}
               className={`px-6 py-2 rounded-full whitespace-nowrap transition-all duration-200 ${
                 filter === key
-                  ? 'bg-appAccent text-white'
-                  : 'bg-appSecondary text-textSecondary hover:text-textPrimary'
+                  ? "bg-appAccent text-white"
+                  : "bg-appSecondary text-textSecondary hover:text-textPrimary"
               }`}
             >
               {label}
@@ -162,7 +166,9 @@ const AccountHistoryPage = () => {
         {/* Content */}
         {loading ? (
           <div className="text-center py-20">
-            <div className="text-textSecondary">Loading your recommendations...</div>
+            <div className="text-textSecondary">
+              Loading your recommendations...
+            </div>
           </div>
         ) : filteredRecommendations.length === 0 ? (
           <div className="text-center py-20">
@@ -171,13 +177,14 @@ const AccountHistoryPage = () => {
                 <User className="w-8 h-8 text-textTertiary" />
               </div>
               <h2 className="text-xl font-semibold text-textPrimary mb-2">
-                {filter === 'favorites' ? 'No favorites yet' : 'No recommendations yet'}
+                {filter === "favorites"
+                  ? "No favorites yet"
+                  : "No recommendations yet"}
               </h2>
               <p className="text-textSecondary mb-6">
-                {filter === 'favorites' 
-                  ? 'Start favoriting recommendations to see them here' 
-                  : 'Get your first personalized recommendation to begin building your library'
-                }
+                {filter === "favorites"
+                  ? "Start favoriting recommendations to see them here"
+                  : "Get your first personalized recommendation to begin building your library"}
               </p>
             </div>
             <button
@@ -216,17 +223,21 @@ const AccountHistoryPage = () => {
                       {rec.title}
                     </h3>
                     <div className="flex items-center gap-2 mb-2">
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        rec.type === 'movie' 
-                          ? 'bg-blue-500 text-white' 
-                          : 'bg-green-500 text-white'
-                      }`}>
+                      <span
+                        className={`px-2 py-1 text-xs rounded-full ${
+                          rec.type === "movie"
+                            ? "bg-blue-500 text-white"
+                            : "bg-green-500 text-white"
+                        }`}
+                      >
                         {rec.type}
                       </span>
                       {rec.rating && (
                         <div className="flex items-center gap-1">
                           <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                          <span className="text-sm text-textSecondary">{rec.rating}</span>
+                          <span className="text-sm text-textSecondary">
+                            {rec.rating}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -235,18 +246,21 @@ const AccountHistoryPage = () => {
                     onClick={() => handleToggleFavorite(rec.id)}
                     className={`p-2 rounded-full transition-colors duration-200 ${
                       rec.is_favorited
-                        ? 'bg-red-500 text-white'
-                        : 'bg-gray-700 text-textSecondary hover:text-red-500'
+                        ? "bg-red-500 text-white"
+                        : "bg-gray-700 text-textSecondary hover:text-red-500"
                     }`}
                   >
-                    <Heart size={16} fill={rec.is_favorited ? 'currentColor' : 'none'} />
+                    <Heart
+                      size={16}
+                      fill={rec.is_favorited ? "currentColor" : "none"}
+                    />
                   </button>
                 </div>
 
                 {/* Genres */}
-                {rec.genre && rec.genre.length > 0 && (
+                {rec.genres && rec.genres.length > 0 && (
                   <div className="flex flex-wrap gap-1 mb-3">
-                    {rec.genre.slice(0, 2).map((g) => (
+                    {rec.genres.slice(0, 2).map((g) => (
                       <span
                         key={g}
                         className="px-2 py-1 bg-gray-700 text-textSecondary text-xs rounded"
@@ -254,9 +268,9 @@ const AccountHistoryPage = () => {
                         {g}
                       </span>
                     ))}
-                    {rec.genre.length > 2 && (
+                    {rec.genres.length > 2 && (
                       <span className="px-2 py-1 bg-gray-700 text-textSecondary text-xs rounded">
-                        +{rec.genre.length - 2}
+                        +{rec.genres.length - 2}
                       </span>
                     )}
                   </div>

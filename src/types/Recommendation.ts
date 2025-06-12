@@ -1,8 +1,7 @@
-
 export interface Recommendation {
   id: string;
   user_id: string;
-  type: 'movie' | 'book';
+  type: "movie" | "book";
   title: string;
   director?: string;
   author?: string;
@@ -12,6 +11,7 @@ export interface Recommendation {
   poster_url?: string;
   explanation?: string;
   is_favorited: boolean;
-  content_type: 'movie' | 'book' | 'both';
+  content_type: "movie" | "book" | "both";
   created_at: string;
+  description?: string;
 }

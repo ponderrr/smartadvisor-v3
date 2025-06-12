@@ -99,10 +99,10 @@ const AuthPage = () => {
     if (!validateSignIn()) return;
 
     setIsLoading(true);
-    const { error } = await signIn(signInData.email, signInData.password);
-    
-    if (error) {
-      setErrors({ general: error.message });
+    const result = await signIn(signInData.email, signInData.password);
+
+    if (result.error) {
+      setErrors({ general: result.error });
     } else {
       navigate("/content-selection");
     }
@@ -114,15 +114,15 @@ const AuthPage = () => {
     if (!validateSignUp()) return;
 
     setIsLoading(true);
-    const { error } = await signUp(
+    const result = await signUp(
       signUpData.email,
       signUpData.password,
       signUpData.fullName,
       parseInt(signUpData.age)
     );
-    
-    if (error) {
-      setErrors({ general: error.message });
+
+    if (result.error) {
+      setErrors({ general: result.error });
     } else {
       navigate("/content-selection");
     }

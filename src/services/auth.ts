@@ -1,13 +1,17 @@
-
-import { supabase } from '@/integrations/supabase/client';
-import { User } from '@/types/User';
+import { supabase } from "@/integrations/supabase/client";
+import { User } from "@/types/User";
 
 export interface AuthError {
   message: string;
 }
 
 class AuthService {
-  async signUp(email: string, password: string, name: string, age: number): Promise<{ error: string | null }> {
+  async signUp(
+    email: string,
+    password: string,
+    name: string,
+    age: number
+  ): Promise<{ error: string | null }> {
     try {
       const { error } = await supabase.auth.signUp({
         email,
@@ -17,17 +21,20 @@ class AuthService {
             name,
             age,
           },
-          emailRedirectTo: `${window.location.origin}/`
-        }
+          emailRedirectTo: `${window.location.origin}/`,
+        },
       });
 
       return { error: error?.message || null };
     } catch (err) {
-      return { error: 'Failed to sign up' };
+      return { error: "Failed to sign up" };
     }
   }
 
-  async signIn(email: string, password: string): Promise<{ error: string | null }> {
+  async signIn(
+    email: string,
+    password: string
+  ): Promise<{ error: string | null }> {
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -36,7 +43,7 @@ class AuthService {
 
       return { error: error?.message || null };
     } catch (err) {
-      return { error: 'Failed to sign in' };
+      return { error: "Failed to sign in" };
     }
   }
 
@@ -45,32 +52,35 @@ class AuthService {
       const { error } = await supabase.auth.signOut();
       return { error: error?.message || null };
     } catch (err) {
-      return { error: 'Failed to sign out' };
+      return { error: "Failed to sign out" };
     }
   }
 
-  async getCurrentUser(): Promise<{ user: User | null, error: string | null }> {
+  async getCurrentUser(): Promise<{ user: User | null; error: string | null }> {
     try {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
+
       if (error || !user) {
-        return { user: null, error: error?.message || 'No user found' };
+        return { user: null, error: error?.message || "No user found" };
       }
 
       // Get user profile
       const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
         .single();
 
       if (profileError || !profile) {
-        return { user: null, error: 'Profile not found' };
+        return { user: null, error: "Profile not found" };
       }
 
       const userData: User = {
         id: user.id,
-        email: profile.email,
+        email: user.email,
         name: profile.name,
         age: profile.age,
         created_at: profile.created_at,
@@ -78,26 +88,34 @@ class AuthService {
 
       return { user: userData, error: null };
     } catch (err) {
-      return { user: null, error: 'Failed to get current user' };
+      return { user: null, error: "Failed to get current user" };
     }
   }
 
-  async updateProfile({ name, age }: { name: string; age: number }): Promise<{ error: string | null }> {
+  async updateProfile({
+    name,
+    age,
+  }: {
+    name: string;
+    age: number;
+  }): Promise<{ error: string | null }> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       if (!user) {
-        return { error: 'No authenticated user' };
+        return { error: "No authenticated user" };
       }
 
       const { error } = await supabase
-        .from('profiles')
+        .from("profiles")
         .update({ name, age, updated_at: new Date().toISOString() })
-        .eq('id', user.id);
+        .eq("id", user.id);
 
       return { error: error?.message || null };
     } catch (err) {
-      return { error: 'Failed to update profile' };
+      return { error: "Failed to update profile" };
     }
   }
 }
