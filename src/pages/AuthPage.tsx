@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 interface SignInFormData {
   email: string;
@@ -17,10 +18,12 @@ interface SignUpFormData {
 
 const AuthPage = () => {
   const navigate = useNavigate();
+  const { signIn, signUp } = useAuth();
   const [isSignIn, setIsSignIn] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const [signInData, setSignInData] = useState<SignInFormData>({
     email: "",
@@ -91,22 +94,39 @@ const AuthPage = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSignIn = (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validateSignIn()) {
-      // TODO: Implement actual authentication
-      console.log("Sign in:", signInData);
-      navigate("/dashboard");
+    if (!validateSignIn()) return;
+
+    setIsLoading(true);
+    const { error } = await signIn(signInData.email, signInData.password);
+    
+    if (error) {
+      setErrors({ general: error.message });
+    } else {
+      navigate("/content-selection");
     }
+    setIsLoading(false);
   };
 
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validateSignUp()) {
-      // TODO: Implement actual registration
-      console.log("Sign up:", signUpData);
-      navigate("/dashboard");
+    if (!validateSignUp()) return;
+
+    setIsLoading(true);
+    const { error } = await signUp(
+      signUpData.email,
+      signUpData.password,
+      signUpData.fullName,
+      parseInt(signUpData.age)
+    );
+    
+    if (error) {
+      setErrors({ general: error.message });
+    } else {
+      navigate("/content-selection");
     }
+    setIsLoading(false);
   };
 
   const toggleForm = (showSignIn: boolean) => {
@@ -155,6 +175,13 @@ const AuthPage = () => {
               Sign Up
             </button>
           </div>
+
+          {/* Error Message */}
+          {errors.general && (
+            <div className="mb-6 p-4 bg-red-500 bg-opacity-10 border border-red-500 rounded-lg">
+              <p className="text-red-500 text-sm">{errors.general}</p>
+            </div>
+          )}
 
           {/* Sign In Form */}
           {isSignIn && (
@@ -221,9 +248,10 @@ const AuthPage = () => {
               {/* Sign In Button */}
               <button
                 type="submit"
-                className="w-full bg-appAccent text-white text-base font-semibold rounded-lg py-4 mt-8 hover:bg-opacity-90 transition-all duration-200"
+                disabled={isLoading}
+                className="w-full bg-appAccent text-white text-base font-semibold rounded-lg py-4 mt-8 hover:bg-opacity-90 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Sign In
+                {isLoading ? "Signing In..." : "Sign In"}
               </button>
 
               {/* Secondary Actions */}
@@ -414,9 +442,10 @@ const AuthPage = () => {
               {/* Sign Up Button */}
               <button
                 type="submit"
-                className="w-full bg-appAccent text-white text-base font-semibold rounded-lg py-4 mt-8 hover:bg-opacity-90 transition-all duration-200"
+                disabled={isLoading}
+                className="w-full bg-appAccent text-white text-base font-semibold rounded-lg py-4 mt-8 hover:bg-opacity-90 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Create Account
+                {isLoading ? "Creating Account..." : "Create Account"}
               </button>
 
               {/* Secondary Actions */}
