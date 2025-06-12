@@ -37,8 +37,8 @@ class RecommendationsService {
           genres: data.genres,
           poster_url: data.poster_url,
           explanation: data.explanation,
-          content_type: data.content_type,
           is_favorited: false,
+          content_type: data.content_type,
         });
 
       return { error: error ? error.message : null };
