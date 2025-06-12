@@ -2,183 +2,191 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Recommendation } from '@/types/Recommendation';
 
-export interface CreateRecommendationData {
-  type: 'movie' | 'book';
-  title: string;
-  director?: string;
-  author?: string;
-  year?: number;
-  rating?: number;
-  genres: string[];
-  poster_url?: string;
-  explanation?: string;
-  content_type: 'movie' | 'book' | 'both';
-}
-
-export interface QuestionnaireResponse {
+interface QuestionnaireResponse {
+  id: string;
+  user_id: string;
   content_type: 'movie' | 'book' | 'both';
   questions: any[];
   answers: any[];
+  created_at: string;
 }
 
-class RecommendationsService {
-  async saveRecommendation(userId: string, data: CreateRecommendationData): Promise<{ error: string | null }> {
-    try {
-      const { error } = await supabase
-        .from('recommendations')
-        .insert({
-          user_id: userId,
-          type: data.type,
-          title: data.title,
-          director: data.director,
-          author: data.author,
-          year: data.year,
-          rating: data.rating,
-          genres: data.genres,
-          poster_url: data.poster_url,
-          explanation: data.explanation,
-          is_favorited: false,
-          content_type: data.content_type,
-        });
-
-      return { error: error ? error.message : null };
-    } catch (err) {
-      return { error: 'Failed to save recommendation' };
+export const saveRecommendation = async (recommendation: Omit<Recommendation, 'id' | 'created_at'>): Promise<{ data: Recommendation | null, error: string | null }> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return { data: null, error: 'User not authenticated' };
     }
-  }
 
-  async getUserRecommendations(userId: string): Promise<{ data: Recommendation[] | null, error: string | null }> {
-    try {
-      const { data, error } = await supabase
-        .from('recommendations')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+    // Convert the recommendation to match database schema
+    const dbRecommendation = {
+      user_id: user.id,
+      type: recommendation.type,
+      title: recommendation.title,
+      description: recommendation.description || '',
+      explanation: recommendation.explanation || '',
+      poster_url: recommendation.poster_url || '',
+      genre: Array.isArray(recommendation.genre) ? recommendation.genre.join(', ') : recommendation.genre || '',
+      rating: recommendation.rating?.toString() || '0',
+      is_favorite: recommendation.is_favorited || false,
+    };
 
-      if (error) {
-        return { data: null, error: error.message };
-      }
+    const { data, error } = await supabase
+      .from('recommendations')
+      .insert(dbRecommendation)
+      .select()
+      .single();
 
-      const recommendations: Recommendation[] = data.map(rec => ({
-        id: rec.id,
-        user_id: rec.user_id,
-        type: rec.type as 'movie' | 'book',
-        title: rec.title,
-        director: rec.director,
-        author: rec.author,
-        year: rec.year,
-        rating: rec.rating,
-        genres: rec.genres || [],
-        poster_url: rec.poster_url,
-        explanation: rec.explanation,
-        is_favorited: rec.is_favorited,
-        content_type: rec.content_type as 'movie' | 'book' | 'both',
-        created_at: rec.created_at,
-      }));
-
-      return { data: recommendations, error: null };
-    } catch (err) {
-      return { data: null, error: 'Failed to load recommendations' };
+    if (error) {
+      console.error('Error saving recommendation:', error);
+      return { data: null, error: error.message };
     }
+
+    // Convert back to our Recommendation type
+    const savedRecommendation: Recommendation = {
+      id: data.id,
+      user_id: data.user_id,
+      type: data.type as 'movie' | 'book',
+      title: data.title,
+      director: recommendation.director,
+      author: recommendation.author,
+      year: recommendation.year,
+      rating: parseFloat(data.rating) || 0,
+      genre: data.genre.split(', ').filter(Boolean),
+      poster_url: data.poster_url,
+      explanation: data.explanation,
+      is_favorited: data.is_favorite,
+      content_type: recommendation.content_type,
+      created_at: data.created_at,
+      description: data.description,
+    };
+
+    return { data: savedRecommendation, error: null };
+  } catch (err) {
+    console.error('Error in saveRecommendation:', err);
+    return { data: null, error: 'Failed to save recommendation' };
   }
+};
 
-  async toggleFavorite(userId: string, recommendationId: string): Promise<{ error: string | null }> {
-    try {
-      // Get current favorite status
-      const { data: current, error: fetchError } = await supabase
-        .from('recommendations')
-        .select('is_favorited')
-        .eq('id', recommendationId)
-        .eq('user_id', userId)
-        .single();
-
-      if (fetchError) {
-        return { error: 'Failed to fetch recommendation' };
-      }
-
-      // Toggle the favorite status
-      const { error } = await supabase
-        .from('recommendations')
-        .update({ is_favorited: !current.is_favorited })
-        .eq('id', recommendationId)
-        .eq('user_id', userId);
-
-      return { error: error ? error.message : null };
-    } catch (err) {
-      return { error: 'Failed to update favorite status' };
+export const getUserRecommendations = async (): Promise<{ data: Recommendation[], error: string | null }> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return { data: [], error: 'User not authenticated' };
     }
-  }
 
-  async saveQuestionnaireResponse(userId: string, response: QuestionnaireResponse): Promise<{ error: string | null }> {
-    try {
-      const { error } = await supabase
-        .from('questionnaire_responses')
-        .insert({
-          user_id: userId,
-          content_type: response.content_type,
-          questions: response.questions,
-          answers: response.answers,
-        });
+    const { data, error } = await supabase
+      .from('recommendations')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
 
-      return { error: error ? error.message : null };
-    } catch (err) {
-      return { error: 'Failed to save questionnaire response' };
+    if (error) {
+      console.error('Error fetching recommendations:', error);
+      return { data: [], error: error.message };
     }
+
+    // Convert database records to our Recommendation type
+    const recommendations: Recommendation[] = data.map(rec => ({
+      id: rec.id,
+      user_id: rec.user_id,
+      type: rec.type as 'movie' | 'book',
+      title: rec.title,
+      director: undefined, // Not stored in current schema
+      author: undefined, // Not stored in current schema
+      year: undefined, // Not stored in current schema
+      rating: parseFloat(rec.rating) || 0,
+      genre: rec.genre ? rec.genre.split(', ').filter(Boolean) : [],
+      poster_url: rec.poster_url,
+      explanation: rec.explanation,
+      is_favorited: rec.is_favorite,
+      content_type: 'both', // Default since not in current schema
+      created_at: rec.created_at,
+      description: rec.description,
+    }));
+
+    return { data: recommendations, error: null };
+  } catch (err) {
+    console.error('Error in getUserRecommendations:', err);
+    return { data: [], error: 'Failed to fetch recommendations' };
   }
+};
 
-  async generateRecommendations(
-    contentType: 'movie' | 'book' | 'both',
-    answers: Record<string, string>,
-    userAge: number
-  ): Promise<{ data: Recommendation[] | null, error: string | null }> {
-    try {
-      // Simulate API delay for now
-      await new Promise(resolve => setTimeout(resolve, 2000));
+export const toggleFavorite = async (recommendationId: string): Promise<{ error: string | null }> => {
+  try {
+    const { data: rec, error: fetchError } = await supabase
+      .from('recommendations')
+      .select('is_favorite')
+      .eq('id', recommendationId)
+      .single();
 
-      const mockRecommendations: Omit<Recommendation, 'id' | 'user_id' | 'created_at'>[] = [];
-      
-      if (contentType === 'movie' || contentType === 'both') {
-        mockRecommendations.push({
-          type: 'movie',
-          title: 'The Shawshank Redemption',
-          director: 'Frank Darabont',
-          year: 1994,
-          rating: 9.3,
-          genres: ['Drama', 'Crime'],
-          poster_url: 'https://images.unsplash.com/photo-1489599731893-01139d4e6b5b?w=300&h=450&fit=crop',
-          explanation: 'Based on your preferences, this classic drama offers compelling character development and themes of hope.',
-          is_favorited: false,
-          content_type: contentType,
-        });
-      }
-
-      if (contentType === 'book' || contentType === 'both') {
-        mockRecommendations.push({
-          type: 'book',
-          title: 'The Midnight Library',
-          author: 'Matt Haig',
-          year: 2020,
-          rating: 4.2,
-          genres: ['Literary Fiction', 'Philosophy'],
-          poster_url: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=300&h=450&fit=crop',
-          explanation: 'This thought-provoking novel explores themes of regret and possibility, perfect for your interests.',
-          is_favorited: false,
-          content_type: contentType,
-        });
-      }
-
-      const recommendations = mockRecommendations.map(rec => ({
-        ...rec,
-        id: `${rec.type}-${Date.now()}`,
-        user_id: '',
-        created_at: new Date().toISOString(),
-      }));
-
-      return { data: recommendations, error: null };
-    } catch (err) {
-      return { data: null, error: 'Failed to generate recommendations' };
+    if (fetchError) {
+      return { error: fetchError.message };
     }
-  }
-}
 
-export const recommendationsService = new RecommendationsService();
+    const { error } = await supabase
+      .from('recommendations')
+      .update({ is_favorite: !rec.is_favorite })
+      .eq('id', recommendationId);
+
+    return { error: error?.message || null };
+  } catch (err) {
+    return { error: 'Failed to toggle favorite' };
+  }
+};
+
+// Mock function for generating recommendations (placeholder)
+export const generateMockRecommendations = async (contentType: 'movie' | 'book' | 'both'): Promise<Recommendation[]> => {
+  const mockMovies: Recommendation[] = [
+    {
+      id: 'mock-movie-1',
+      user_id: 'user-1',
+      type: 'movie',
+      title: 'The Shawshank Redemption',
+      director: 'Frank Darabont',
+      author: undefined,
+      year: 1994,
+      rating: 9.3,
+      genre: ['Drama'],
+      poster_url: 'https://example.com/shawshank.jpg',
+      explanation: 'A powerful story of hope and friendship.',
+      is_favorited: false,
+      content_type: contentType,
+      created_at: new Date().toISOString(),
+      description: 'Two imprisoned men bond over a number of years.',
+    }
+  ];
+
+  const mockBooks: Recommendation[] = [
+    {
+      id: 'mock-book-1',
+      user_id: 'user-1',
+      type: 'book',
+      title: 'To Kill a Mockingbird',
+      director: undefined,
+      author: 'Harper Lee',
+      year: 1960,
+      rating: 4.3,
+      genre: ['Fiction', 'Classic'],
+      poster_url: 'https://example.com/mockingbird.jpg',
+      explanation: 'A timeless tale of moral courage.',
+      is_favorited: false,
+      content_type: contentType,
+      created_at: new Date().toISOString(),
+      description: 'A story of racial injustice and childhood innocence.',
+    }
+  ];
+
+  switch (contentType) {
+    case 'movie':
+      return mockMovies;
+    case 'book':
+      return mockBooks;
+    case 'both':
+      return [...mockMovies, ...mockBooks];
+    default:
+      return [];
+  }
+};

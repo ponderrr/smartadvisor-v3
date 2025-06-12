@@ -1,14 +1,25 @@
-import { useNavigate } from "react-router-dom";
 
-const LandingPage = () => {
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+
+const Index = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const handleGetStarted = () => {
-    navigate("/auth");
+    if (user) {
+      navigate("/history");
+    } else {
+      navigate("/auth");
+    }
   };
 
   const handleSignIn = () => {
-    navigate("/auth");
+    if (user) {
+      navigate("/history");
+    } else {
+      navigate("/auth");
+    }
   };
 
   return (
@@ -23,7 +34,7 @@ const LandingPage = () => {
             onClick={handleSignIn}
             className="text-textSecondary text-sm font-normal cursor-pointer hover:text-textPrimary transition-colors duration-200"
           >
-            Sign In
+            {user ? "Dashboard" : "Sign In"}
           </button>
         </div>
       </header>
@@ -41,7 +52,7 @@ const LandingPage = () => {
             onClick={handleGetStarted}
             className="bg-appAccent text-white text-lg font-medium py-4 px-8 rounded-lg hover:bg-opacity-90 transition-all duration-200"
           >
-            Get Started
+            {user ? "View My History" : "Get Started"}
           </button>
         </div>
       </section>
@@ -105,4 +116,4 @@ const LandingPage = () => {
   );
 };
 
-export default LandingPage;
+export default Index;

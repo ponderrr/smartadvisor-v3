@@ -1,6 +1,8 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Film, Book, Target, Loader2 } from "lucide-react";
+import { Film, Book, Target, Loader2, User, Settings, LogOut } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 type ContentType = "movie" | "book" | "both" | null;
 
@@ -53,15 +55,10 @@ const SelectionCard: React.FC<SelectionCardProps> = ({
 
 const ContentSelectionPage = () => {
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   const [selectedType, setSelectedType] = useState<ContentType>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  // Mock user data - replace with actual user context/state
-  const user = {
-    name: "Alex",
-    avatar:
-      "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-2.jpg",
-  };
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   const handleLogoClick = () => {
     navigate("/");
@@ -88,6 +85,11 @@ const ContentSelectionPage = () => {
       console.error("Error proceeding to questionnaire:", error);
       setIsLoading(false);
     }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
   };
 
   const cards = [
@@ -124,27 +126,39 @@ const ContentSelectionPage = () => {
         >
           Smart Advisor
         </button>
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center overflow-hidden">
-            <img
-              src={user.avatar}
-              alt="User avatar"
-              className="w-8 h-8 rounded-full object-cover"
-              onError={(e) => {
-                // Fallback to initials if image fails
-                const target = e.target as HTMLImageElement;
-                target.style.display = "none";
-                target.parentElement!.innerHTML = user.name
-                  .charAt(0)
-                  .toUpperCase();
-                target.parentElement!.className +=
-                  " text-white text-sm font-medium";
-              }}
-            />
-          </div>
-          <span className="text-textSecondary text-[15px]">
-            Hi, {user.name}
-          </span>
+        <div className="relative">
+          <button
+            onClick={() => setShowUserMenu(!showUserMenu)}
+            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity duration-200"
+          >
+            <div className="w-8 h-8 bg-appAccent rounded-full flex items-center justify-center">
+              <span className="text-white text-sm font-medium">
+                {user?.name.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <span className="text-textSecondary text-[15px]">
+              Hi, {user?.name}
+            </span>
+          </button>
+          
+          {showUserMenu && (
+            <div className="absolute right-0 top-full mt-2 w-48 bg-appSecondary border border-gray-700 rounded-lg shadow-lg z-50">
+              <button
+                onClick={() => navigate("/history")}
+                className="w-full flex items-center gap-2 px-4 py-3 text-textSecondary hover:text-textPrimary hover:bg-gray-700 transition-colors duration-200"
+              >
+                <User size={16} />
+                View History
+              </button>
+              <button
+                onClick={handleSignOut}
+                className="w-full flex items-center gap-2 px-4 py-3 text-textSecondary hover:text-textPrimary hover:bg-gray-700 transition-colors duration-200 border-t border-gray-700"
+              >
+                <LogOut size={16} />
+                Sign Out
+              </button>
+            </div>
+          )}
         </div>
       </header>
 

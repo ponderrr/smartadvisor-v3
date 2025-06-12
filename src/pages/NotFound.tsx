@@ -1,25 +1,61 @@
-import { useLocation } from "react-router-dom";
-import { useEffect } from "react";
+
+import { useNavigate } from "react-router-dom";
+import { Home, ArrowLeft } from "lucide-react";
 
 const NotFound = () => {
-  const location = useLocation();
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    console.error(
-      "404 Error: User attempted to access non-existent route:",
-      location.pathname
-    );
-  }, [location.pathname]);
+  const handleGoHome = () => {
+    navigate("/");
+  };
+
+  const handleGoBack = () => {
+    navigate(-1);
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">404</h1>
-        <p className="text-xl text-gray-600 mb-4">Oops! Page not found</p>
-        <a href="/" className="text-blue-500 hover:text-blue-700 underline">
-          Return to Home
-        </a>
-      </div>
+    <div className="bg-appPrimary text-textPrimary font-inter min-h-screen">
+      {/* Header */}
+      <header className="h-[72px] flex items-center justify-between px-6 md:px-12 bg-appPrimary">
+        <button
+          onClick={handleGoHome}
+          className="text-textPrimary text-xl font-medium cursor-pointer hover:opacity-80 transition-opacity duration-200"
+        >
+          Smart Advisor
+        </button>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex flex-col items-center justify-center px-6 pt-[120px] pb-[100px]">
+        <div className="max-w-[600px] text-center">
+          <h1 className="text-6xl md:text-8xl font-bold text-textPrimary mb-6">
+            404
+          </h1>
+          <h2 className="text-2xl md:text-3xl font-semibold text-textPrimary mb-4">
+            Page Not Found
+          </h2>
+          <p className="text-lg text-textSecondary mb-12 leading-relaxed">
+            Sorry, the page you're looking for doesn't exist. It might have been moved, deleted, or you entered the wrong URL.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <button
+              onClick={handleGoBack}
+              className="flex items-center justify-center gap-2 bg-appSecondary text-textPrimary border border-gray-700 px-6 py-3 rounded-lg hover:bg-gray-600 transition-all duration-200"
+            >
+              <ArrowLeft size={20} />
+              Go Back
+            </button>
+            <button
+              onClick={handleGoHome}
+              className="flex items-center justify-center gap-2 bg-appAccent text-white px-6 py-3 rounded-lg hover:bg-opacity-90 transition-all duration-200"
+            >
+              <Home size={20} />
+              Go Home
+            </button>
+          </div>
+        </div>
+      </main>
     </div>
   );
 };

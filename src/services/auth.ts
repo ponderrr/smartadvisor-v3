@@ -70,7 +70,7 @@ class AuthService {
 
       const userData: User = {
         id: user.id,
-        email: user.email!,
+        email: profile.email,
         name: profile.name,
         age: profile.age,
         created_at: profile.created_at,

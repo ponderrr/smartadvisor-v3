@@ -11,19 +11,38 @@ import ContentSelectionPage from "./pages/ContentSelectionPage";
 import QuestionnairePage from "./pages/QuestionnairePage";
 import ResultsPage from "./pages/ResultsPage";
 import AccountHistoryPage from "./pages/AccountHistoryPage";
+import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
 const AppContent = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-appPrimary flex items-center justify-center">
+        <div className="text-textPrimary">Loading...</div>
+      </div>
+    );
+  }
   
   return (
     <Routes>
-      <Route path="/" element={<Index />} />
+      {/* Public Routes */}
+      <Route 
+        path="/" 
+        element={
+          user ? <Navigate to="/history" replace /> : <Index />
+        } 
+      />
       <Route 
         path="/auth" 
-        element={user ? <Navigate to="/content-selection" replace /> : <AuthPage />} 
+        element={
+          user ? <Navigate to="/history" replace /> : <AuthPage />
+        } 
       />
+      
+      {/* Protected Routes */}
       <Route 
         path="/content-selection" 
         element={
@@ -56,6 +75,9 @@ const AppContent = () => {
           </ProtectedRoute>
         } 
       />
+      
+      {/* 404 Route */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 };

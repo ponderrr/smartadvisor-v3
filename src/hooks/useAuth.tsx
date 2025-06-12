@@ -40,7 +40,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (profile) {
             setUser({
               id: session.user.id,
-              email: session.user.email!,
+              email: profile.email,
               name: profile.name,
               age: profile.age,
               created_at: profile.created_at,
