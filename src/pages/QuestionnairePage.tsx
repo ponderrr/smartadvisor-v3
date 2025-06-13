@@ -1,7 +1,10 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Loader2, AlertCircle } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Progress } from '@/components/ui/progress';
+import { ArrowLeft, ArrowRight, Loader2, User, LogOut } from 'lucide-react';
 import { useAuth } from "@/hooks/useAuth";
 import { generateQuestionsWithRetry } from "@/services/openai";
 import { Question } from "@/types/Question";
@@ -10,45 +13,39 @@ import { Answer } from "@/types/Answer";
 const QuestionnairePage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
-  // Get contentType from navigation state
-  const { contentType } = location.state || {};
+  const contentType = location.state?.contentType as "movie" | "book" | "both";
 
   useEffect(() => {
-    // Redirect if no contentType or user
     if (!contentType || !user) {
       navigate("/content-selection");
       return;
     }
 
-    // Generate AI questions
     const loadQuestions = async () => {
       try {
-        setLoading(true);
+        setIsLoading(true);
         setError(null);
         
-        console.log('Generating AI questions for:', { contentType, userAge: user.age });
+        const generatedQuestions = await generateQuestionsWithRetry(
+          contentType,
+          user.age
+        );
         
-        const aiQuestions = await generateQuestionsWithRetry(contentType, user.age);
-        
-        if (!aiQuestions || aiQuestions.length === 0) {
-          throw new Error('No questions were generated');
-        }
-        
-        setQuestions(aiQuestions);
-        console.log('Questions loaded successfully:', aiQuestions.length);
-      } catch (error) {
-        console.error("Error generating questions:", error);
-        setError(error instanceof Error ? error.message : "Failed to generate questions");
+        setQuestions(generatedQuestions);
+      } catch (err) {
+        setError("Failed to generate questions. Please try again.");
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
 
@@ -59,8 +56,15 @@ const QuestionnairePage = () => {
     navigate("/");
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
+
+  const currentQuestion = questions[currentQuestionIndex];
+  const progress = questions.length > 0 ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0;
+
   const handleAnswer = (answer: string) => {
-    const currentQuestion = questions[currentQuestionIndex];
     setAnswers(prev => ({
       ...prev,
       [currentQuestion.id]: answer
@@ -71,22 +75,7 @@ const QuestionnairePage = () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
     } else {
-      // Convert answers to Answer format
-      const formattedAnswers: Answer[] = questions.map(question => ({
-        question_id: question.id,
-        answer_text: answers[question.id] || '',
-        user_id: user!.id,
-        created_at: new Date().toISOString()
-      }));
-
-      // Navigate to results page
-      navigate("/results", {
-        state: {
-          contentType,
-          answers: formattedAnswers,
-          questions
-        }
-      });
+      handleComplete();
     }
   };
 
@@ -98,195 +87,257 @@ const QuestionnairePage = () => {
     }
   };
 
-  const handleRetry = () => {
-    window.location.reload();
+  const handleComplete = async () => {
+    if (!user) return;
+
+    setIsSubmitting(true);
+    
+    const formattedAnswers: Answer[] = questions.map(q => ({
+      question_id: q.id,
+      answer_text: answers[q.id] || "",
+      user_id: user.id,
+    }));
+
+    navigate("/results", {
+      state: {
+        answers: formattedAnswers,
+        contentType,
+        userAge: user.age,
+      },
+    });
   };
 
-  if (!contentType || !user) {
-    return null; // Redirect will happen in useEffect
-  }
+  const canProceed = currentQuestion && answers[currentQuestion.id]?.trim().length > 0;
 
-  // Loading state
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="bg-appPrimary text-textPrimary font-inter min-h-screen">
-        {/* Header */}
-        <header className="h-[72px] flex items-center justify-between px-6 md:px-12 bg-appPrimary">
+        <header className="h-[72px] flex items-center justify-between px-6 md:px-12">
           <button
             onClick={handleLogoClick}
-            className="text-textPrimary text-xl font-medium cursor-pointer hover:opacity-80 transition-opacity duration-200"
+            className="text-textPrimary text-xl font-medium"
           >
             Smart Advisor
           </button>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-appAccent rounded-full flex items-center justify-center">
-              <span className="text-white text-sm font-medium">
-                {user.name.charAt(0).toUpperCase()}
+          <div className="relative">
+            <button
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="flex items-center gap-2"
+            >
+              <div className="w-8 h-8 bg-appAccent rounded-full flex items-center justify-center">
+                <span className="text-white text-sm font-medium">
+                  {user?.name.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <span className="text-textSecondary text-[15px]">
+                Hi, {user?.name}
               </span>
-            </div>
-            <span className="text-textSecondary text-[15px]">
-              Hi, {user.name}
-            </span>
+            </button>
+            
+            {showUserMenu && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-appSecondary border border-gray-700 rounded-lg shadow-lg z-50">
+                <button
+                  onClick={() => navigate("/history")}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-textSecondary hover:text-textPrimary hover:bg-gray-700 transition-colors duration-200"
+                >
+                  <User size={16} />
+                  View History
+                </button>
+                <button
+                  onClick={handleSignOut}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-textSecondary hover:text-textPrimary hover:bg-gray-700 transition-colors duration-200 border-t border-gray-700"
+                >
+                  <LogOut size={16} />
+                  Sign Out
+                </button>
+              </div>
+            )}
           </div>
         </header>
 
-        {/* Loading Content */}
-        <main className="flex flex-col items-center justify-center px-6 pt-[120px] pb-[100px]">
+        <main className="flex flex-col items-center justify-center px-6 pt-[120px]">
           <div className="text-center">
-            <Loader2 className="w-16 h-16 text-appAccent animate-spin mx-auto mb-8" />
-            <h1 className="text-3xl md:text-4xl font-bold text-textPrimary mb-4">
-              Generating Your Questions
-            </h1>
-            <p className="text-lg text-textSecondary mb-4">
-              Our AI is creating personalized questions based on your preferences for{" "}
-              {contentType === 'both' ? 'movies and books' : contentType}...
+            <Loader2 className="w-16 h-16 animate-spin text-appAccent mx-auto mb-4" />
+            <h2 className="text-2xl font-semibold text-textPrimary mb-2">
+              Generating Your Questions...
+            </h2>
+            <p className="text-textSecondary">
+              Our AI is creating personalized questions just for you.
             </p>
-            <div className="text-sm text-textTertiary">
-              This may take a few seconds
-            </div>
           </div>
         </main>
       </div>
     );
   }
 
-  // Error state
   if (error) {
     return (
       <div className="bg-appPrimary text-textPrimary font-inter min-h-screen">
-        {/* Header */}
-        <header className="h-[72px] flex items-center justify-between px-6 md:px-12 bg-appPrimary">
+        <header className="h-[72px] flex items-center justify-between px-6 md:px-12">
           <button
             onClick={handleLogoClick}
-            className="text-textPrimary text-xl font-medium cursor-pointer hover:opacity-80 transition-opacity duration-200"
+            className="text-textPrimary text-xl font-medium"
           >
             Smart Advisor
           </button>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-appAccent rounded-full flex items-center justify-center">
-              <span className="text-white text-sm font-medium">
-                {user.name.charAt(0).toUpperCase()}
+          <div className="relative">
+            <button
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="flex items-center gap-2"
+            >
+              <div className="w-8 h-8 bg-appAccent rounded-full flex items-center justify-center">
+                <span className="text-white text-sm font-medium">
+                  {user?.name.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <span className="text-textSecondary text-[15px]">
+                Hi, {user?.name}
               </span>
-            </div>
-            <span className="text-textSecondary text-[15px]">
-              Hi, {user.name}
-            </span>
+            </button>
+            
+            {showUserMenu && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-appSecondary border border-gray-700 rounded-lg shadow-lg z-50">
+                <button
+                  onClick={() => navigate("/history")}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-textSecondary hover:text-textPrimary hover:bg-gray-700 transition-colors duration-200"
+                >
+                  <User size={16} />
+                  View History
+                </button>
+                <button
+                  onClick={handleSignOut}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-textSecondary hover:text-textPrimary hover:bg-gray-700 transition-colors duration-200 border-t border-gray-700"
+                >
+                  <LogOut size={16} />
+                  Sign Out
+                </button>
+              </div>
+            )}
           </div>
         </header>
-
-        {/* Error Content */}
-        <main className="flex flex-col items-center justify-center px-6 pt-[120px] pb-[100px]">
+        
+        <main className="flex flex-col items-center justify-center px-6 pt-[120px]">
           <div className="text-center max-w-md">
-            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-8" />
-            <h1 className="text-3xl md:text-4xl font-bold text-textPrimary mb-4">
-              Unable to Generate Questions
-            </h1>
-            <p className="text-lg text-textSecondary mb-8">
-              {error}
-            </p>
-            <div className="flex gap-4 justify-center">
-              <button
-                onClick={handleRetry}
-                className="bg-appAccent text-white px-6 py-3 rounded-lg hover:bg-opacity-90 transition-all duration-200"
-              >
-                Try Again
-              </button>
-              <button
-                onClick={() => navigate('/content-selection')}
-                className="bg-appSecondary border border-gray-700 text-textPrimary px-6 py-3 rounded-lg hover:bg-gray-600 transition-all duration-200"
-              >
-                Go Back
-              </button>
-            </div>
+            <h2 className="text-2xl font-semibold text-textPrimary mb-4">
+              Oops! Something went wrong
+            </h2>
+            <p className="text-textSecondary mb-6">{error}</p>
+            <Button 
+              onClick={() => window.location.reload()}
+              className="bg-appAccent hover:bg-opacity-90"
+            >
+              Try Again
+            </Button>
           </div>
         </main>
       </div>
     );
   }
 
-  // Main questionnaire content
-  const currentQuestion = questions[currentQuestionIndex];
-  const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
-  const canProceed = answers[currentQuestion.id]?.trim().length > 0;
-
   return (
     <div className="bg-appPrimary text-textPrimary font-inter min-h-screen">
-      {/* Header */}
-      <header className="h-[72px] flex items-center justify-between px-6 md:px-12 bg-appPrimary">
+      <header className="h-[72px] flex items-center justify-between px-6 md:px-12">
         <button
           onClick={handleLogoClick}
-          className="text-textPrimary text-xl font-medium cursor-pointer hover:opacity-80 transition-opacity duration-200"
+          className="text-textPrimary text-xl font-medium"
         >
           Smart Advisor
         </button>
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-appAccent rounded-full flex items-center justify-center">
-            <span className="text-white text-sm font-medium">
-              {user.name.charAt(0).toUpperCase()}
+        <div className="relative">
+          <button
+            onClick={() => setShowUserMenu(!showUserMenu)}
+            className="flex items-center gap-2"
+          >
+            <div className="w-8 h-8 bg-appAccent rounded-full flex items-center justify-center">
+              <span className="text-white text-sm font-medium">
+                {user?.name.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <span className="text-textSecondary text-[15px]">
+              Hi, {user?.name}
             </span>
-          </div>
-          <span className="text-textSecondary text-[15px]">
-            Hi, {user.name}
-          </span>
+          </button>
+          
+          {showUserMenu && (
+            <div className="absolute right-0 top-full mt-2 w-48 bg-appSecondary border border-gray-700 rounded-lg shadow-lg z-50">
+              <button
+                onClick={() => navigate("/history")}
+                className="w-full flex items-center gap-2 px-4 py-3 text-textSecondary hover:text-textPrimary hover:bg-gray-700 transition-colors duration-200"
+              >
+                <User size={16} />
+                View History
+              </button>
+              <button
+                onClick={handleSignOut}
+                className="w-full flex items-center gap-2 px-4 py-3 text-textSecondary hover:text-textPrimary hover:bg-gray-700 transition-colors duration-200 border-t border-gray-700"
+              >
+                <LogOut size={16} />
+                Sign Out
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="px-6 pt-[80px] md:pt-[120px] pb-[100px]">
-        {/* Progress Indicator */}
-        <div className="text-center text-textTertiary text-sm mb-8">
-          Step 2 of 3 • Question {currentQuestionIndex + 1} of {questions.length}
-        </div>
-
-        {/* Progress Bar */}
-        <div className="max-w-2xl mx-auto mb-12">
-          <div className="w-full bg-appSecondary rounded-full h-2">
-            <div
-              className="bg-appAccent h-2 rounded-full transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Question Content */}
         <div className="max-w-2xl mx-auto">
-          <div className="bg-appSecondary border border-gray-700 rounded-2xl p-8 mb-8">
-            <h1 className="text-2xl md:text-3xl font-bold text-textPrimary mb-6">
-              {currentQuestion.text}
-            </h1>
-            <p className="text-textSecondary mb-6">
-              Take your time to think about your answer. The more details you provide, the better we can tailor our recommendation.
-            </p>
-            <textarea
-              value={answers[currentQuestion.id] || ''}
-              onChange={(e) => handleAnswer(e.target.value)}
-              placeholder="Share your thoughts..."
-              className="w-full h-32 p-4 bg-appPrimary border border-gray-600 rounded-lg text-textPrimary placeholder-textTertiary resize-none focus:outline-none focus:border-appAccent transition-colors duration-200"
-            />
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h1 className="text-2xl font-semibold text-textPrimary">
+                Question {currentQuestionIndex + 1} of {questions.length}
+              </h1>
+              <span className="text-sm text-textSecondary capitalize">
+                {contentType} recommendation
+              </span>
+            </div>
+            <Progress value={progress} className="h-2" />
           </div>
 
-          {/* Navigation */}
-          <div className="flex justify-between">
-            <button
-              onClick={handlePrevious}
-              className="flex items-center gap-2 bg-appSecondary border border-gray-700 text-textPrimary px-6 py-3 rounded-lg hover:bg-gray-600 transition-all duration-200"
-            >
-              <ArrowLeft size={20} />
-              Previous
-            </button>
+          <Card className="mb-8 bg-appSecondary border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-xl text-textPrimary">
+                {currentQuestion.text}
+              </CardTitle>
+              <CardDescription className="text-textSecondary">
+                Take your time to think about your answer. The more details you provide, the better we can tailor our recommendation.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                value={answers[currentQuestion.id] || ''}
+                onChange={(e) => handleAnswer(e.target.value)}
+                placeholder="Share your thoughts..."
+                className="min-h-32 resize-none bg-appPrimary border-gray-600 text-textPrimary"
+              />
+            </CardContent>
+          </Card>
 
-            <button
-              onClick={handleNext}
-              disabled={!canProceed}
-              className={`flex items-center gap-2 px-6 py-3 rounded-lg transition-all duration-200 ${
-                canProceed
-                  ? "bg-appAccent text-white hover:bg-opacity-90"
-                  : "bg-gray-600 text-gray-400 cursor-not-allowed"
-              }`}
+          <div className="flex justify-between">
+            <Button
+              variant="outline"
+              onClick={handlePrevious}
+              className="flex items-center space-x-2 border-gray-600 text-textSecondary hover:text-textPrimary"
             >
-              {currentQuestionIndex === questions.length - 1 ? 'Get Recommendations' : 'Next'}
-              <ArrowRight size={20} />
-            </button>
+              <ArrowLeft className="w-4 h-4" />
+              <span>Previous</span>
+            </Button>
+
+            <Button
+              onClick={handleNext}
+              disabled={!canProceed || isSubmitting}
+              className="flex items-center space-x-2 bg-appAccent hover:bg-opacity-90"
+            >
+              {isSubmitting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <span>
+                    {currentQuestionIndex === questions.length - 1 ? 'Get Recommendations' : 'Next'}
+                  </span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </Button>
           </div>
         </div>
       </main>

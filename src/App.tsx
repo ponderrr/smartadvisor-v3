@@ -6,7 +6,6 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { validateEnvironment } from "@/utils/envValidation";
 import { useEffect } from "react";
 
-// Import pages
 import Index from "@/pages/Index";
 import AuthPage from "@/pages/AuthPage";
 import ContentSelectionPage from "@/pages/ContentSelectionPage";
@@ -16,20 +15,21 @@ import AccountHistoryPage from "@/pages/AccountHistoryPage";
 import NotFound from "@/pages/NotFound";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 2,
+    },
+  },
+});
 
 function App() {
   useEffect(() => {
-    // Validate environment variables on app startup
     const validation = validateEnvironment();
     
-    if (!validation.isValid) {
-      console.error('Missing required environment variables:', validation.missingKeys);
-      
-      // Check specifically for OpenAI key since it's critical
-      if (!import.meta.env.VITE_OPENAI_API_KEY) {
-        console.error('CRITICAL: VITE_OPENAI_API_KEY is missing. AI features will not work.');
-      }
+    if (!validation.isValid && import.meta.env.DEV) {
+      console.warn('Missing environment variables:', validation.missingKeys);
     }
   }, []);
 

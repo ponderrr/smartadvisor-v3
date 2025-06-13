@@ -3,16 +3,14 @@ import OpenAI from 'openai';
 import { Question } from '@/types/Question';
 import { Answer } from '@/types/Answer';
 
-// Validate API key on module load
 const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
 if (!apiKey) {
-  console.error('Missing VITE_OPENAI_API_KEY environment variable');
   throw new Error('OpenAI API key is required for Smart Advisor to function');
 }
 
 const openai = new OpenAI({
   apiKey,
-  dangerouslyAllowBrowser: true // Required for Vite client-side usage
+  dangerouslyAllowBrowser: true
 });
 
 export interface MovieRecommendation {
@@ -31,14 +29,14 @@ export interface BookRecommendation {
   explanation: string;
 }
 
+/**
+ * Generates personalized recommendation questions using OpenAI
+ */
 export async function generateQuestions(
   contentType: 'movie' | 'book' | 'both', 
   userAge: number
 ): Promise<Question[]> {
-  try {
-    console.log(`Generating AI questions for ${contentType}, age ${userAge}`);
-    
-    const prompt = `Generate exactly 5 personalized recommendation questions for a ${userAge}-year-old user who wants ${contentType} recommendations. 
+  const prompt = `Generate exactly 5 personalized recommendation questions for a ${userAge}-year-old user who wants ${contentType} recommendations. 
     
     Requirements:
     - Questions should be conversational and engaging
@@ -54,59 +52,50 @@ export async function generateQuestions(
     
     Generate 5 unique questions now as valid JSON array:`;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: "You are a helpful assistant that generates personalized recommendation questions. Always respond with valid JSON."
-        },
-        { 
-          role: "user", 
-          content: prompt 
-        }
-      ],
-      max_tokens: 1000,
-      temperature: 0.7
-    });
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      {
+        role: "system",
+        content: "You are a helpful assistant that generates personalized recommendation questions. Always respond with valid JSON."
+      },
+      { 
+        role: "user", 
+        content: prompt 
+      }
+    ],
+    max_tokens: 1000,
+    temperature: 0.7
+  });
 
-    const questionsText = completion.choices[0].message.content;
-    if (!questionsText) {
-      throw new Error('No response from OpenAI');
-    }
-    
-    console.log('Raw OpenAI response:', questionsText);
-    
-    const questions = JSON.parse(questionsText);
-    
-    // Validate and format the questions
-    const formattedQuestions: Question[] = questions.map((q: any, index: number) => ({
-      id: q.id || `q${index + 1}`,
-      text: q.text,
-      content_type: contentType,
-      user_age_range: `${Math.floor(userAge / 10) * 10}-${Math.floor(userAge / 10) * 10 + 9}`,
-    }));
-    
-    console.log('AI-generated questions:', formattedQuestions);
-    return formattedQuestions;
-    
-  } catch (error) {
-    console.error('OpenAI questions error:', error);
-    throw new Error('Failed to generate personalized questions. Please check your internet connection and try again.');
+  const questionsText = completion.choices[0].message.content;
+  if (!questionsText) {
+    throw new Error('No response from OpenAI');
   }
+  
+  const questions = JSON.parse(questionsText);
+  
+  const formattedQuestions: Question[] = questions.map((q: any, index: number) => ({
+    id: q.id || `q${index + 1}`,
+    text: q.text,
+    content_type: contentType,
+    user_age_range: `${Math.floor(userAge / 10) * 10}-${Math.floor(userAge / 10) * 10 + 9}`,
+  }));
+  
+  return formattedQuestions;
 }
 
+/**
+ * Generates personalized recommendations using OpenAI
+ */
 export async function generateRecommendations(
   answers: Answer[],
   contentType: 'movie' | 'book' | 'both',
   userAge: number
 ): Promise<{ movieRecommendation?: MovieRecommendation; bookRecommendation?: BookRecommendation }> {
-  try {
-    console.log(`Generating AI recommendations for ${contentType}, age ${userAge}`);
-    
-    const answersText = answers.map((a, i) => `Q${i+1}: ${a.answer_text}`).join('\n');
-    
-    const prompt = `Based on these user answers, generate ${contentType} recommendations for a ${userAge}-year-old:
+  const answersText = answers.map((a, i) => `Q${i+1}: ${a.answer_text}`).join('\n');
+  
+  const prompt = `Based on these user answers, generate ${contentType} recommendations for a ${userAge}-year-old:
 
 ${answersText}
 
@@ -136,41 +125,33 @@ ${contentType === 'book' || contentType === 'both' ? `${contentType === 'both' ?
 
 Generate personalized recommendations now:`;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: "You are a personalized recommendation engine. Always respond with valid JSON in the exact format requested."
-        },
-        { 
-          role: "user", 
-          content: prompt 
-        }
-      ],
-      max_tokens: 1500,
-      temperature: 0.8
-    });
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      {
+        role: "system",
+        content: "You are a personalized recommendation engine. Always respond with valid JSON in the exact format requested."
+      },
+      { 
+        role: "user", 
+        content: prompt 
+      }
+    ],
+    max_tokens: 1500,
+    temperature: 0.8
+  });
 
-    const recommendationsText = completion.choices[0].message.content;
-    if (!recommendationsText) {
-      throw new Error('No response from OpenAI');
-    }
-    
-    console.log('Raw OpenAI recommendations:', recommendationsText);
-    
-    const recommendations = JSON.parse(recommendationsText);
-    
-    console.log('AI-generated recommendations:', recommendations);
-    return recommendations;
-    
-  } catch (error) {
-    console.error('OpenAI recommendations error:', error);
-    throw new Error('Failed to generate personalized recommendations. Please check your internet connection and try again.');
+  const recommendationsText = completion.choices[0].message.content;
+  if (!recommendationsText) {
+    throw new Error('No response from OpenAI');
   }
+  
+  return JSON.parse(recommendationsText);
 }
 
-// Retry wrapper for handling rate limits and temporary failures
+/**
+ * Retry wrapper for question generation with exponential backoff
+ */
 export async function generateQuestionsWithRetry(
   contentType: 'movie' | 'book' | 'both',
   userAge: number,
@@ -183,12 +164,9 @@ export async function generateQuestionsWithRetry(
       return await generateQuestions(contentType, userAge);
     } catch (error) {
       lastError = error;
-      console.warn(`Question generation attempt ${attempt} failed:`, error);
       
       if (attempt < maxRetries) {
-        // Exponential backoff: wait 2^attempt seconds
         const delay = Math.pow(2, attempt) * 1000;
-        console.log(`Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -197,6 +175,9 @@ export async function generateQuestionsWithRetry(
   throw lastError;
 }
 
+/**
+ * Retry wrapper for recommendation generation with exponential backoff
+ */
 export async function generateRecommendationsWithRetry(
   answers: Answer[],
   contentType: 'movie' | 'book' | 'both',
@@ -210,12 +191,9 @@ export async function generateRecommendationsWithRetry(
       return await generateRecommendations(answers, contentType, userAge);
     } catch (error) {
       lastError = error;
-      console.warn(`Recommendation generation attempt ${attempt} failed:`, error);
       
       if (attempt < maxRetries) {
-        // Exponential backoff: wait 2^attempt seconds
         const delay = Math.pow(2, attempt) * 1000;
-        console.log(`Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
