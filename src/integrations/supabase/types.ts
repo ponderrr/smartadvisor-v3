@@ -13,6 +13,7 @@ export type Database = {
         Row: {
           age: number
           created_at: string | null
+          email: string | null
           id: string
           name: string
           updated_at: string | null
@@ -20,6 +21,7 @@ export type Database = {
         Insert: {
           age: number
           created_at?: string | null
+          email?: string | null
           id: string
           name: string
           updated_at?: string | null
@@ -27,6 +29,7 @@ export type Database = {
         Update: {
           age?: number
           created_at?: string | null
+          email?: string | null
           id?: string
           name?: string
           updated_at?: string | null
@@ -35,43 +38,55 @@ export type Database = {
       }
       recommendations: {
         Row: {
+          author: string | null
+          content_type: string
           created_at: string | null
           description: string | null
+          director: string | null
           explanation: string | null
           genre: string | null
           id: string
-          is_favorite: boolean | null
+          is_favorited: boolean | null
           poster_url: string | null
-          rating: string | null
+          rating: number | null
           title: string
           type: string
           user_id: string
+          year: number | null
         }
         Insert: {
+          author?: string | null
+          content_type?: string
           created_at?: string | null
           description?: string | null
+          director?: string | null
           explanation?: string | null
           genre?: string | null
           id?: string
-          is_favorite?: boolean | null
+          is_favorited?: boolean | null
           poster_url?: string | null
-          rating?: string | null
+          rating?: number | null
           title: string
           type: string
           user_id: string
+          year?: number | null
         }
         Update: {
+          author?: string | null
+          content_type?: string
           created_at?: string | null
           description?: string | null
+          director?: string | null
           explanation?: string | null
           genre?: string | null
           id?: string
-          is_favorite?: boolean | null
+          is_favorited?: boolean | null
           poster_url?: string | null
-          rating?: string | null
+          rating?: number | null
           title?: string
           type?: string
           user_id?: string
+          year?: number | null
         }
         Relationships: []
       }

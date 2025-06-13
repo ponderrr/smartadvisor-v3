@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Recommendation } from "@/types/Recommendation";
 
@@ -9,23 +10,14 @@ interface RecommendationTableRow {
   director?: string;
   author?: string;
   year?: number;
-  rating: string;
-  genre: string;
+  rating?: number;
+  genre?: string;
   poster_url?: string;
   explanation?: string;
-  is_favorite: boolean;
+  is_favorited?: boolean;
   content_type: "movie" | "book" | "both";
   created_at: string;
   description?: string;
-}
-
-interface QuestionnaireResponse {
-  id: string;
-  user_id: string;
-  content_type: "movie" | "book" | "both";
-  questions: any[];
-  answers: any[];
-  created_at: string;
 }
 
 export const saveRecommendation = async (
@@ -51,20 +43,18 @@ export const saveRecommendation = async (
       genre: Array.isArray(recommendation.genres)
         ? recommendation.genres.join(", ")
         : "",
-      rating: recommendation.rating?.toString() || "0",
-      is_favorite: recommendation.is_favorited || false,
+      rating: recommendation.rating || null,
+      is_favorited: recommendation.is_favorited || false,
       content_type: recommendation.content_type,
-      director: recommendation.director || undefined,
-      author: recommendation.author || undefined,
-      year: recommendation.year || undefined,
+      director: recommendation.director || null,
+      author: recommendation.author || null,
+      year: recommendation.year || null,
     };
 
     const { data: rawData, error } = await supabase
       .from("recommendations")
       .insert(dbRecommendation)
-      .select(
-        "id, user_id, type, title, director, author, year, rating, genre, poster_url, explanation, is_favorite, content_type, created_at, description"
-      )
+      .select()
       .single<RecommendationTableRow>();
 
     if (error) {
@@ -83,11 +73,11 @@ export const saveRecommendation = async (
       director: data.director || undefined,
       author: data.author || undefined,
       year: data.year || undefined,
-      rating: parseFloat(data.rating) || 0,
+      rating: data.rating || 0,
       genres: data.genre ? data.genre.split(", ").filter(Boolean) : [],
       poster_url: data.poster_url || undefined,
       explanation: data.explanation || undefined,
-      is_favorited: data.is_favorite,
+      is_favorited: data.is_favorited || false,
       content_type: data.content_type,
       created_at: data.created_at,
       description: data.description || undefined,
@@ -115,9 +105,7 @@ export const getUserRecommendations = async (): Promise<{
 
     const { data, error } = await supabase
       .from("recommendations")
-      .select(
-        "id, user_id, type, title, director, author, year, rating, genre, poster_url, explanation, is_favorite, content_type, created_at, description"
-      )
+      .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .returns<RecommendationTableRow[]>();
@@ -137,11 +125,11 @@ export const getUserRecommendations = async (): Promise<{
         director: rec.director,
         author: rec.author,
         year: rec.year,
-        rating: parseFloat(rec.rating) || 0,
+        rating: rec.rating || 0,
         genres: rec.genre ? rec.genre.split(", ").filter(Boolean) : [],
         poster_url: rec.poster_url,
         explanation: rec.explanation,
-        is_favorited: rec.is_favorite,
+        is_favorited: rec.is_favorited || false,
         content_type: rec.content_type,
         created_at: rec.created_at,
         description: rec.description,
@@ -161,7 +149,7 @@ export const toggleFavorite = async (
   try {
     const { data: rec, error: fetchError } = await supabase
       .from("recommendations")
-      .select("is_favorite")
+      .select("is_favorited")
       .eq("id", recommendationId)
       .single();
 
@@ -171,7 +159,7 @@ export const toggleFavorite = async (
 
     const { error } = await supabase
       .from("recommendations")
-      .update({ is_favorite: !rec.is_favorite })
+      .update({ is_favorited: !rec.is_favorited })
       .eq("id", recommendationId);
 
     return { error: error?.message || null };
@@ -180,65 +168,8 @@ export const toggleFavorite = async (
   }
 };
 
-// Mock function for generating recommendations (placeholder)
-export const generateMockRecommendations = async (
-  contentType: "movie" | "book" | "both"
-): Promise<Recommendation[]> => {
-  const mockMovies: Recommendation[] = [
-    {
-      id: "mock-movie-1",
-      user_id: "user-1",
-      type: "movie",
-      title: "The Shawshank Redemption",
-      director: "Frank Darabont",
-      author: undefined,
-      year: 1994,
-      rating: 9.3,
-      genres: ["Drama"],
-      poster_url: "https://example.com/shawshank.jpg",
-      explanation: "A powerful story of hope and friendship.",
-      is_favorited: false,
-      content_type: contentType,
-      created_at: new Date().toISOString(),
-      description: "Two imprisoned men bond over a number of years.",
-    },
-  ];
-
-  const mockBooks: Recommendation[] = [
-    {
-      id: "mock-book-1",
-      user_id: "user-1",
-      type: "book",
-      title: "To Kill a Mockingbird",
-      director: undefined,
-      author: "Harper Lee",
-      year: 1960,
-      rating: 4.3,
-      genres: ["Fiction", "Classic"],
-      poster_url: "https://example.com/mockingbird.jpg",
-      explanation: "A timeless tale of moral courage.",
-      is_favorited: false,
-      content_type: contentType,
-      created_at: new Date().toISOString(),
-      description: "A story of racial injustice and childhood innocence.",
-    },
-  ];
-
-  switch (contentType) {
-    case "movie":
-      return mockMovies;
-    case "book":
-      return mockBooks;
-    case "both":
-      return [...mockMovies, ...mockBooks];
-    default:
-      return [];
-  }
-};
-
 export const recommendationsService = {
   saveRecommendation,
   getUserRecommendations,
   toggleFavorite,
-  generateMockRecommendations,
 };
