@@ -16,120 +16,128 @@ export interface RecommendationItem {
   isFavorite?: boolean;
 }
 
-class SupabaseRecommendationService {
-  async generateRecommendations(
-    contentType: 'movie' | 'book' | 'both',
-    answers: Record<string, string>,
-    userAge: number
-  ): Promise<RecommendationItem[]> {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+class RecommendationService {
+  async saveRecommendation(userId: string, recommendation: any) {
+    try {
+      const { data, error } = await supabase
+        .from('recommendations')
+        .insert({
+          user_id: userId,
+          type: recommendation.type,
+          title: recommendation.title,
+          description: recommendation.description || '',
+          explanation: recommendation.explanation || '',
+          genre: recommendation.genre || '',
+          rating: recommendation.rating ? parseFloat(recommendation.rating.toString()) : null,
+          year: recommendation.year ? parseInt(recommendation.year.toString()) : null,
+          author: recommendation.author || null,
+          director: recommendation.director || null,
+          poster_url: recommendation.posterUrl || null,
+          is_favorited: false,
+          content_type: recommendation.contentType || 'both'
+        })
+        .select()
+        .single();
 
-    const recommendations: RecommendationItem[] = [];
-    
-    if (contentType === 'movie' || contentType === 'both') {
-      recommendations.push({
-        id: `movie-${Date.now()}`,
-        type: 'movie',
-        title: 'The Shawshank Redemption',
-        description: 'Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.',
-        explanation: `Based on your preference for ${answers.genre || 'drama'} and ${answers.mood || 'thoughtful'} content, this classic film offers deep character development and hope.`,
-        genre: 'Drama',
-        rating: '9.3/10',
-        year: '1994',
-        director: 'Frank Darabont',
-        posterUrl: 'https://images.unsplash.com/photo-1489599731893-01139d4e6b5b?w=300&h=450&fit=crop',
-        isFavorite: false,
-      });
-    }
+      if (error) {
+        console.error('Error saving recommendation:', error);
+        throw error;
+      }
 
-    if (contentType === 'book' || contentType === 'both') {
-      recommendations.push({
-        id: `book-${Date.now()}`,
-        type: 'book',
-        title: 'The Midnight Library',
-        description: 'Between life and death there is a library, and within that library, the shelves go on forever.',
-        explanation: `Given your interest in ${answers.theme || 'life choices'} and ${answers.setting || 'contemporary'} stories, this philosophical novel explores different life paths.`,
-        genre: 'Literary Fiction',
-        rating: '4.2/5',
-        year: '2020',
-        author: 'Matt Haig',
-        posterUrl: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=300&h=450&fit=crop',
-        isFavorite: false,
-      });
-    }
-
-    return recommendations;
-  }
-
-  async saveRecommendation(userId: string, recommendation: RecommendationItem): Promise<void> {
-    const { error } = await supabase
-      .from('recommendations')
-      .insert({
-        user_id: userId,
-        type: recommendation.type,
-        title: recommendation.title,
-        description: recommendation.description,
-        explanation: recommendation.explanation,
-        poster_url: recommendation.posterUrl,
-        genre: recommendation.genre,
-        rating: recommendation.rating,
-        is_favorite: recommendation.isFavorite || false,
-      });
-
-    if (error) {
-      throw new Error('Failed to save recommendation');
+      return data;
+    } catch (error) {
+      console.error('Failed to save recommendation:', error);
+      throw error;
     }
   }
 
   async getUserRecommendations(userId: string): Promise<RecommendationItem[]> {
-    const { data, error } = await supabase
-      .from('recommendations')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('recommendations')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      throw new Error('Failed to load recommendations');
+      if (error) {
+        console.error('Error fetching recommendations:', error);
+        throw error;
+      }
+
+      return data?.map(rec => ({
+        id: rec.id,
+        type: rec.type as 'movie' | 'book',
+        title: rec.title,
+        description: rec.description || '',
+        explanation: rec.explanation || '',
+        genre: rec.genre || '',
+        rating: rec.rating?.toString(),
+        year: rec.year?.toString(),
+        author: rec.author,
+        director: rec.director,
+        posterUrl: rec.poster_url,
+        isFavorite: rec.is_favorited
+      })) || [];
+    } catch (error) {
+      console.error('Failed to fetch recommendations:', error);
+      return [];
     }
-
-    return data.map(rec => ({
-      id: rec.id,
-      type: rec.type as 'movie' | 'book',
-      title: rec.title,
-      description: rec.description || '',
-      explanation: rec.explanation || '',
-      genre: rec.genre || '',
-      rating: rec.rating || undefined,
-      posterUrl: rec.poster_url || undefined,
-      isFavorite: rec.is_favorite,
-    }));
   }
 
-  async toggleFavorite(userId: string, recommendationId: string): Promise<void> {
-    // Get current favorite status
-    const { data: current, error: fetchError } = await supabase
-      .from('recommendations')
-      .select('is_favorite')
-      .eq('id', recommendationId)
-      .eq('user_id', userId)
-      .single();
+  async toggleFavorite(userId: string, recommendationId: string) {
+    try {
+      // First get the current state
+      const { data: current, error: fetchError } = await supabase
+        .from('recommendations')
+        .select('is_favorited')
+        .eq('id', recommendationId)
+        .eq('user_id', userId)
+        .single();
 
-    if (fetchError) {
-      throw new Error('Failed to fetch recommendation');
+      if (fetchError) throw fetchError;
+
+      // Toggle the favorite status
+      const { data, error } = await supabase
+        .from('recommendations')
+        .update({
+          is_favorited: !current.is_favorited
+        })
+        .eq('id', recommendationId)
+        .eq('user_id', userId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error toggling favorite:', error);
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+      throw error;
     }
+  }
 
-    // Toggle the favorite status
-    const { error } = await supabase
-      .from('recommendations')
-      .update({ is_favorite: !current.is_favorite })
-      .eq('id', recommendationId)
-      .eq('user_id', userId);
+  async deleteRecommendation(userId: string, recommendationId: string) {
+    try {
+      const { error } = await supabase
+        .from('recommendations')
+        .delete()
+        .eq('id', recommendationId)
+        .eq('user_id', userId);
 
-    if (error) {
-      throw new Error('Failed to update favorite status');
+      if (error) {
+        console.error('Error deleting recommendation:', error);
+        throw error;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Failed to delete recommendation:', error);
+      throw error;
     }
   }
 }
 
-export const recommendationService = new SupabaseRecommendationService();
+export const recommendationService = new RecommendationService();

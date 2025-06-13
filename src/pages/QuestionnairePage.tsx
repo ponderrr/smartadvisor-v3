@@ -1,135 +1,112 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, ArrowRight, User, LogOut, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { openaiService } from "@/services/openai";
+import { generateQuestionsWithRetry } from "@/services/openai";
 import { Question } from "@/types/Question";
-
-interface Answer {
-  questionId: string;
-  value: string | number;
-}
+import { Answer } from "@/types/Answer";
 
 const QuestionnairePage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
+  
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState<Answer[]>([]);
-  const [showUserMenu, setShowUserMenu] = useState(false);
-  const [hasUnsavedData, setHasUnsavedData] = useState(false);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Get content type from navigation state
-  const contentType = location.state?.contentType as 'movie' | 'book' | 'both';
+  // Get contentType from navigation state
+  const { contentType } = location.state || {};
 
-  // Generate questions on page load
   useEffect(() => {
-    if (!contentType) {
-      navigate('/content-selection');
+    // Redirect if no contentType or user
+    if (!contentType || !user) {
+      navigate("/content-selection");
       return;
     }
 
+    // Generate AI questions
     const loadQuestions = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        console.log('Generating questions for:', { contentType, userAge: user?.age });
+        console.log('Generating AI questions for:', { contentType, userAge: user.age });
         
-        const generatedQuestions = await openaiService.generateQuestions(
-          contentType, 
-          user?.age || 25
-        );
+        const aiQuestions = await generateQuestionsWithRetry(contentType, user.age);
         
-        console.log('Questions generated:', generatedQuestions);
-        setQuestions(generatedQuestions);
-      } catch (err) {
-        console.error('Error generating questions:', err);
-        setError('Failed to generate questions. Please try again.');
+        if (!aiQuestions || aiQuestions.length === 0) {
+          throw new Error('No questions were generated');
+        }
+        
+        setQuestions(aiQuestions);
+        console.log('Questions loaded successfully:', aiQuestions.length);
+      } catch (error) {
+        console.error("Error generating questions:", error);
+        setError(error instanceof Error ? error.message : "Failed to generate questions");
       } finally {
         setLoading(false);
       }
     };
 
     loadQuestions();
-  }, [contentType, user?.age, navigate]);
-
-  // Check for unsaved data
-  useEffect(() => {
-    setHasUnsavedData(answers.length > 0);
-  }, [answers]);
+  }, [contentType, user, navigate]);
 
   const handleLogoClick = () => {
-    if (hasUnsavedData) {
-      const confirmed = window.confirm('You have unsaved progress. Are you sure you want to leave?');
-      if (!confirmed) return;
-    }
     navigate("/");
   };
 
-  const handleAnswerChange = (value: string | number) => {
+  const handleAnswer = (answer: string) => {
     const currentQuestion = questions[currentQuestionIndex];
-    const newAnswers = answers.filter(a => a.questionId !== currentQuestion.id);
-    newAnswers.push({ questionId: currentQuestion.id, value });
-    setAnswers(newAnswers);
-  };
-
-  const getCurrentAnswer = () => {
-    const currentQuestion = questions[currentQuestionIndex];
-    return answers.find(a => a.questionId === currentQuestion.id)?.value;
+    setAnswers(prev => ({
+      ...prev,
+      [currentQuestion.id]: answer
+    }));
   };
 
   const handleNext = () => {
     if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      setCurrentQuestionIndex(prev => prev + 1);
+    } else {
+      // Convert answers to Answer format
+      const formattedAnswers: Answer[] = questions.map(question => ({
+        question_id: question.id,
+        answer_text: answers[question.id] || '',
+        user_id: user!.id,
+        created_at: new Date().toISOString()
+      }));
+
+      // Navigate to results page
+      navigate("/results", {
+        state: {
+          contentType,
+          answers: formattedAnswers,
+          questions
+        }
+      });
     }
   };
 
   const handlePrevious = () => {
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1);
+      setCurrentQuestionIndex(prev => prev - 1);
+    } else {
+      navigate("/content-selection");
     }
-  };
-
-  const handleFinish = () => {
-    // Convert answers to the format expected by the results page
-    const formattedAnswers = answers.map(a => ({
-      question_id: a.questionId,
-      answer_text: a.value.toString(),
-      user_id: user?.id || '',
-      created_at: new Date().toISOString()
-    }));
-
-    // Navigate to results with answers and content type
-    navigate('/results', {
-      state: {
-        contentType,
-        answers: formattedAnswers,
-        questions
-      }
-    });
-  };
-
-  const handleSignOut = async () => {
-    if (hasUnsavedData) {
-      const confirmed = window.confirm('You have unsaved progress. Are you sure you want to sign out?');
-      if (!confirmed) return;
-    }
-    await signOut();
-    navigate("/");
   };
 
   const handleRetry = () => {
     window.location.reload();
   };
 
-  if (!contentType) {
+  if (!contentType || !user) {
     return null; // Redirect will happen in useEffect
   }
 
+  // Loading state
   if (loading) {
     return (
       <div className="bg-appPrimary text-textPrimary font-inter min-h-screen">
@@ -141,39 +118,15 @@ const QuestionnairePage = () => {
           >
             Smart Advisor
           </button>
-          <div className="relative">
-            <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity duration-200"
-            >
-              <div className="w-8 h-8 bg-appAccent rounded-full flex items-center justify-center">
-                <span className="text-white text-sm font-medium">
-                  {user?.name.charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <span className="text-textSecondary text-[15px]">
-                Hi, {user?.name}
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-appAccent rounded-full flex items-center justify-center">
+              <span className="text-white text-sm font-medium">
+                {user.name.charAt(0).toUpperCase()}
               </span>
-            </button>
-            
-            {showUserMenu && (
-              <div className="absolute right-0 top-full mt-2 w-48 bg-appSecondary border border-gray-700 rounded-lg shadow-lg z-50">
-                <button
-                  onClick={() => navigate("/history")}
-                  className="w-full flex items-center gap-2 px-4 py-3 text-textSecondary hover:text-textPrimary hover:bg-gray-700 transition-colors duration-200"
-                >
-                  <User size={16} />
-                  View History
-                </button>
-                <button
-                  onClick={handleSignOut}
-                  className="w-full flex items-center gap-2 px-4 py-3 text-textSecondary hover:text-textPrimary hover:bg-gray-700 transition-colors duration-200 border-t border-gray-700"
-                >
-                  <LogOut size={16} />
-                  Sign Out
-                </button>
-              </div>
-            )}
+            </div>
+            <span className="text-textSecondary text-[15px]">
+              Hi, {user.name}
+            </span>
           </div>
         </header>
 
@@ -184,15 +137,20 @@ const QuestionnairePage = () => {
             <h1 className="text-3xl md:text-4xl font-bold text-textPrimary mb-4">
               Generating Your Questions
             </h1>
-            <p className="text-lg text-textSecondary">
-              Our AI is creating personalized questions based on your preferences...
+            <p className="text-lg text-textSecondary mb-4">
+              Our AI is creating personalized questions based on your preferences for{" "}
+              {contentType === 'both' ? 'movies and books' : contentType}...
             </p>
+            <div className="text-sm text-textTertiary">
+              This may take a few seconds
+            </div>
           </div>
         </main>
       </div>
     );
   }
 
+  // Error state
   if (error) {
     return (
       <div className="bg-appPrimary text-textPrimary font-inter min-h-screen">
@@ -204,50 +162,24 @@ const QuestionnairePage = () => {
           >
             Smart Advisor
           </button>
-          <div className="relative">
-            <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity duration-200"
-            >
-              <div className="w-8 h-8 bg-appAccent rounded-full flex items-center justify-center">
-                <span className="text-white text-sm font-medium">
-                  {user?.name.charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <span className="text-textSecondary text-[15px]">
-                Hi, {user?.name}
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-appAccent rounded-full flex items-center justify-center">
+              <span className="text-white text-sm font-medium">
+                {user.name.charAt(0).toUpperCase()}
               </span>
-            </button>
-            
-            {showUserMenu && (
-              <div className="absolute right-0 top-full mt-2 w-48 bg-appSecondary border border-gray-700 rounded-lg shadow-lg z-50">
-                <button
-                  onClick={() => navigate("/history")}
-                  className="w-full flex items-center gap-2 px-4 py-3 text-textSecondary hover:text-textPrimary hover:bg-gray-700 transition-colors duration-200"
-                >
-                  <User size={16} />
-                  View History
-                </button>
-                <button
-                  onClick={handleSignOut}
-                  className="w-full flex items-center gap-2 px-4 py-3 text-textSecondary hover:text-textPrimary hover:bg-gray-700 transition-colors duration-200 border-t border-gray-700"
-                >
-                  <LogOut size={16} />
-                  Sign Out
-                </button>
-              </div>
-            )}
+            </div>
+            <span className="text-textSecondary text-[15px]">
+              Hi, {user.name}
+            </span>
           </div>
         </header>
 
         {/* Error Content */}
         <main className="flex flex-col items-center justify-center px-6 pt-[120px] pb-[100px]">
           <div className="text-center max-w-md">
-            <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-8">
-              <span className="text-white text-2xl">!</span>
-            </div>
+            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-8" />
             <h1 className="text-3xl md:text-4xl font-bold text-textPrimary mb-4">
-              Oops! Something went wrong
+              Unable to Generate Questions
             </h1>
             <p className="text-lg text-textSecondary mb-8">
               {error}
@@ -272,14 +204,10 @@ const QuestionnairePage = () => {
     );
   }
 
-  if (questions.length === 0) {
-    return null;
-  }
-
+  // Main questionnaire content
   const currentQuestion = questions[currentQuestionIndex];
-  const currentAnswer = getCurrentAnswer();
-  const isLastQuestion = currentQuestionIndex === questions.length - 1;
-  const canProceed = currentAnswer !== undefined && currentAnswer !== '';
+  const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+  const canProceed = answers[currentQuestion.id]?.trim().length > 0;
 
   return (
     <div className="bg-appPrimary text-textPrimary font-inter min-h-screen">
@@ -291,116 +219,75 @@ const QuestionnairePage = () => {
         >
           Smart Advisor
         </button>
-        <div className="relative">
-          <button
-            onClick={() => setShowUserMenu(!showUserMenu)}
-            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity duration-200"
-          >
-            <div className="w-8 h-8 bg-appAccent rounded-full flex items-center justify-center">
-              <span className="text-white text-sm font-medium">
-                {user?.name.charAt(0).toUpperCase()}
-              </span>
-            </div>
-            <span className="text-textSecondary text-[15px]">
-              Hi, {user?.name}
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-appAccent rounded-full flex items-center justify-center">
+            <span className="text-white text-sm font-medium">
+              {user.name.charAt(0).toUpperCase()}
             </span>
-          </button>
-          
-          {showUserMenu && (
-            <div className="absolute right-0 top-full mt-2 w-48 bg-appSecondary border border-gray-700 rounded-lg shadow-lg z-50">
-              <button
-                onClick={() => navigate("/history")}
-                className="w-full flex items-center gap-2 px-4 py-3 text-textSecondary hover:text-textPrimary hover:bg-gray-700 transition-colors duration-200"
-              >
-                <User size={16} />
-                View History
-              </button>
-              <button
-                onClick={handleSignOut}
-                className="w-full flex items-center gap-2 px-4 py-3 text-textSecondary hover:text-textPrimary hover:bg-gray-700 transition-colors duration-200 border-t border-gray-700"
-              >
-                <LogOut size={16} />
-                Sign Out
-              </button>
-            </div>
-          )}
+          </div>
+          <span className="text-textSecondary text-[15px]">
+            Hi, {user.name}
+          </span>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex flex-col items-center px-6 pt-[80px] md:pt-[120px] pb-[100px]">
+      <main className="px-6 pt-[80px] md:pt-[120px] pb-[100px]">
         {/* Progress Indicator */}
-        <div className="text-textTertiary text-sm mb-8">
+        <div className="text-center text-textTertiary text-sm mb-8">
           Step 2 of 3 • Question {currentQuestionIndex + 1} of {questions.length}
         </div>
 
         {/* Progress Bar */}
-        <div className="w-full max-w-[600px] bg-gray-700 rounded-full h-2 mb-12">
-          <div
-            className="bg-appAccent h-2 rounded-full transition-all duration-300"
-            style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
-          />
-        </div>
-
-        {/* Question */}
-        <div className="max-w-[600px] w-full text-center mb-12">
-          <h1 className="text-3xl md:text-4xl font-bold text-textPrimary mb-8">
-            {currentQuestion.text}
-          </h1>
-
-          {/* Answer Input */}
-          <div className="space-y-4">
-            <textarea
-              value={currentAnswer as string || ''}
-              onChange={(e) => handleAnswerChange(e.target.value)}
-              placeholder="Share your thoughts..."
-              className="w-full p-4 bg-appSecondary border border-gray-700 rounded-lg text-textPrimary placeholder:text-textTertiary focus:outline-none focus:border-appAccent transition-colors duration-200 min-h-[120px] resize-none"
-              rows={4}
+        <div className="max-w-2xl mx-auto mb-12">
+          <div className="w-full bg-appSecondary rounded-full h-2">
+            <div
+              className="bg-appAccent h-2 rounded-full transition-all duration-500"
+              style={{ width: `${progress}%` }}
             />
           </div>
         </div>
 
-        {/* Navigation Buttons */}
-        <div className="flex gap-4">
-          <button
-            onClick={handlePrevious}
-            disabled={currentQuestionIndex === 0}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg border transition-all duration-200 ${
-              currentQuestionIndex === 0
-                ? 'border-gray-700 text-textTertiary cursor-not-allowed'
-                : 'border-gray-600 text-textSecondary hover:border-appAccent hover:text-textPrimary'
-            }`}
-          >
-            <ArrowLeft size={16} />
-            Previous
-          </button>
+        {/* Question Content */}
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-appSecondary border border-gray-700 rounded-2xl p-8 mb-8">
+            <h1 className="text-2xl md:text-3xl font-bold text-textPrimary mb-6">
+              {currentQuestion.text}
+            </h1>
+            <p className="text-textSecondary mb-6">
+              Take your time to think about your answer. The more details you provide, the better we can tailor our recommendation.
+            </p>
+            <textarea
+              value={answers[currentQuestion.id] || ''}
+              onChange={(e) => handleAnswer(e.target.value)}
+              placeholder="Share your thoughts..."
+              className="w-full h-32 p-4 bg-appPrimary border border-gray-600 rounded-lg text-textPrimary placeholder-textTertiary resize-none focus:outline-none focus:border-appAccent transition-colors duration-200"
+            />
+          </div>
 
-          {isLastQuestion ? (
+          {/* Navigation */}
+          <div className="flex justify-between">
             <button
-              onClick={handleFinish}
-              disabled={!canProceed}
-              className={`flex items-center gap-2 px-6 py-3 rounded-lg transition-all duration-200 ${
-                canProceed
-                  ? 'bg-appAccent text-white hover:bg-opacity-90'
-                  : 'bg-gray-700 text-textTertiary cursor-not-allowed'
-              }`}
+              onClick={handlePrevious}
+              className="flex items-center gap-2 bg-appSecondary border border-gray-700 text-textPrimary px-6 py-3 rounded-lg hover:bg-gray-600 transition-all duration-200"
             >
-              Get My Recommendations
+              <ArrowLeft size={20} />
+              Previous
             </button>
-          ) : (
+
             <button
               onClick={handleNext}
               disabled={!canProceed}
               className={`flex items-center gap-2 px-6 py-3 rounded-lg transition-all duration-200 ${
                 canProceed
-                  ? 'bg-appAccent text-white hover:bg-opacity-90'
-                  : 'bg-gray-700 text-textTertiary cursor-not-allowed'
+                  ? "bg-appAccent text-white hover:bg-opacity-90"
+                  : "bg-gray-600 text-gray-400 cursor-not-allowed"
               }`}
             >
-              Next
-              <ArrowRight size={16} />
+              {currentQuestionIndex === questions.length - 1 ? 'Get Recommendations' : 'Next'}
+              <ArrowRight size={20} />
             </button>
-          )}
+          </div>
         </div>
       </main>
     </div>

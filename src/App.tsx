@@ -1,105 +1,86 @@
 
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import Index from "./pages/Index";
-import AuthPage from "./pages/AuthPage";
-import ContentSelectionPage from "./pages/ContentSelectionPage";
-import QuestionnairePage from "./pages/QuestionnairePage";
-import ResultsPage from "./pages/ResultsPage";
-import AccountHistoryPage from "./pages/AccountHistoryPage";
-import NotFound from "./pages/NotFound";
-import { validateEnvironment } from "./utils/envValidation";
+import { Toaster } from "@/components/ui/sonner";
+import { AuthProvider } from "@/hooks/useAuth";
+import { validateEnvironment } from "@/utils/envValidation";
 import { useEffect } from "react";
+
+// Import pages
+import Index from "@/pages/Index";
+import AuthPage from "@/pages/AuthPage";
+import ContentSelectionPage from "@/pages/ContentSelectionPage";
+import QuestionnairePage from "@/pages/QuestionnairePage";
+import ResultsPage from "@/pages/ResultsPage";
+import AccountHistoryPage from "@/pages/AccountHistoryPage";
+import NotFound from "@/pages/NotFound";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
-const AppContent = () => {
-  const { user, loading } = useAuth();
-  
+function App() {
   useEffect(() => {
     // Validate environment variables on app startup
-    validateEnvironment();
+    const validation = validateEnvironment();
+    
+    if (!validation.isValid) {
+      console.error('Missing required environment variables:', validation.missingKeys);
+      
+      // Check specifically for OpenAI key since it's critical
+      if (!import.meta.env.VITE_OPENAI_API_KEY) {
+        console.error('CRITICAL: VITE_OPENAI_API_KEY is missing. AI features will not work.');
+      }
+    }
   }, []);
-  
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-appPrimary flex items-center justify-center">
-        <div className="text-textPrimary">Loading...</div>
-      </div>
-    );
-  }
-  
-  return (
-    <Routes>
-      {/* Public Routes */}
-      <Route 
-        path="/" 
-        element={
-          user ? <Navigate to="/history" replace /> : <Index />
-        } 
-      />
-      <Route 
-        path="/auth" 
-        element={
-          user ? <Navigate to="/history" replace /> : <AuthPage />
-        } 
-      />
-      
-      {/* Protected Routes */}
-      <Route 
-        path="/content-selection" 
-        element={
-          <ProtectedRoute>
-            <ContentSelectionPage />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/questionnaire" 
-        element={
-          <ProtectedRoute>
-            <QuestionnairePage />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/results" 
-        element={
-          <ProtectedRoute>
-            <ResultsPage />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/history" 
-        element={
-          <ProtectedRoute>
-            <AccountHistoryPage />
-          </ProtectedRoute>
-        } 
-      />
-      
-      {/* 404 Route */}
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  );
-};
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
+  return (
+    <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <BrowserRouter>
-          <AppContent />
+        <Router>
+          <div className="min-h-screen bg-background font-sans antialiased">
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<AuthPage />} />
+              <Route
+                path="/content-selection"
+                element={
+                  <ProtectedRoute>
+                    <ContentSelectionPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/questionnaire"
+                element={
+                  <ProtectedRoute>
+                    <QuestionnairePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/results"
+                element={
+                  <ProtectedRoute>
+                    <ResultsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/history"
+                element={
+                  <ProtectedRoute>
+                    <AccountHistoryPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </div>
           <Toaster />
-        </BrowserRouter>
+        </Router>
       </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+    </QueryClientProvider>
+  );
+}
 
 export default App;

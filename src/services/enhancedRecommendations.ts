@@ -1,7 +1,7 @@
 
 import { Recommendation } from "@/types/Recommendation";
 import { Answer } from "@/types/Answer";
-import { openaiService } from "./openai";
+import { generateRecommendationsWithRetry } from "./openai";
 import { tmdbService } from "./tmdb";
 import { googleBooksService } from "./googleBooks";
 import { recommendationsService } from "./recommendations";
@@ -20,10 +20,10 @@ class EnhancedRecommendationsService {
     const { answers, contentType, userAge } = questionnaireData;
 
     try {
-      console.log('Starting recommendation generation for:', { contentType, userAge, answersCount: answers.length });
+      console.log('Starting AI recommendation generation for:', { contentType, userAge, answersCount: answers.length });
 
-      // 1. Call OpenAI to get recommendations
-      const aiRecommendations = await openaiService.generateRecommendations(
+      // 1. Call OpenAI to get AI-generated recommendations
+      const aiRecommendations = await generateRecommendationsWithRetry(
         answers,
         contentType,
         userAge
@@ -112,7 +112,7 @@ class EnhancedRecommendationsService {
       return recommendations;
     } catch (error) {
       console.error("Error generating full recommendation:", error);
-      throw new Error("Failed to generate recommendations");
+      throw new Error("Failed to generate AI-powered recommendations. Please try again.");
     }
   }
 
