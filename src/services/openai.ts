@@ -30,7 +30,8 @@ class OpenAIService {
 
   async generateQuestions(contentType: 'movie' | 'book' | 'both', userAge: number): Promise<Question[]> {
     if (!this.apiKey) {
-      throw new Error('OpenAI API key not configured');
+      console.warn('OpenAI API key not configured, using fallback questions');
+      return this.getDefaultQuestions(contentType);
     }
 
     try {
@@ -91,7 +92,8 @@ class OpenAIService {
     userAge: number
   ): Promise<{ movieRecommendation?: MovieRecommendation; bookRecommendation?: BookRecommendation }> {
     if (!this.apiKey) {
-      throw new Error('OpenAI API key not configured');
+      console.warn('OpenAI API key not configured, using fallback recommendations');
+      return this.getDefaultRecommendations(contentType);
     }
 
     try {

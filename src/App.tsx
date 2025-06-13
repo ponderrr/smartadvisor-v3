@@ -12,11 +12,18 @@ import QuestionnairePage from "./pages/QuestionnairePage";
 import ResultsPage from "./pages/ResultsPage";
 import AccountHistoryPage from "./pages/AccountHistoryPage";
 import NotFound from "./pages/NotFound";
+import { validateEnvironment } from "./utils/envValidation";
+import { useEffect } from "react";
 
 const queryClient = new QueryClient();
 
 const AppContent = () => {
   const { user, loading } = useAuth();
+  
+  useEffect(() => {
+    // Validate environment variables on app startup
+    validateEnvironment();
+  }, []);
   
   if (loading) {
     return (

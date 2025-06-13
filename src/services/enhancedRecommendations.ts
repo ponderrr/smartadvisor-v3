@@ -1,3 +1,4 @@
+
 import { Recommendation } from "@/types/Recommendation";
 import { Answer } from "@/types/Answer";
 import { openaiService } from "./openai";
@@ -19,6 +20,8 @@ class EnhancedRecommendationsService {
     const { answers, contentType, userAge } = questionnaireData;
 
     try {
+      console.log('Starting recommendation generation for:', { contentType, userAge, answersCount: answers.length });
+
       // 1. Call OpenAI to get recommendations
       const aiRecommendations = await openaiService.generateRecommendations(
         answers,
@@ -26,11 +29,14 @@ class EnhancedRecommendationsService {
         userAge
       );
 
+      console.log('AI recommendations received:', aiRecommendations);
+
       const recommendations: Recommendation[] = [];
 
       // 2. Process movie recommendation
       if (aiRecommendations.movieRecommendation) {
         const movieRec = aiRecommendations.movieRecommendation;
+        console.log('Processing movie recommendation:', movieRec.title);
 
         // Enhance with TMDB data
         const tmdbData = await tmdbService.searchMovie(movieRec.title);
@@ -51,22 +57,22 @@ class EnhancedRecommendationsService {
         };
 
         // Save to Supabase
-        const { error } = await recommendationsService.saveRecommendation(
+        const { data, error } = await recommendationsService.saveRecommendation(
           movieRecommendation
         );
 
-        if (!error) {
-          recommendations.push({
-            ...movieRecommendation,
-            id: `movie-${Date.now()}`,
-            created_at: new Date().toISOString(),
-          });
+        if (!error && data) {
+          recommendations.push(data);
+          console.log('Movie recommendation saved successfully');
+        } else {
+          console.error('Error saving movie recommendation:', error);
         }
       }
 
       // 3. Process book recommendation
       if (aiRecommendations.bookRecommendation) {
         const bookRec = aiRecommendations.bookRecommendation;
+        console.log('Processing book recommendation:', bookRec.title);
 
         // Enhance with Google Books data
         const booksData = await googleBooksService.searchBook(
@@ -90,19 +96,19 @@ class EnhancedRecommendationsService {
         };
 
         // Save to Supabase
-        const { error } = await recommendationsService.saveRecommendation(
+        const { data, error } = await recommendationsService.saveRecommendation(
           bookRecommendation
         );
 
-        if (!error) {
-          recommendations.push({
-            ...bookRecommendation,
-            id: `book-${Date.now()}`,
-            created_at: new Date().toISOString(),
-          });
+        if (!error && data) {
+          recommendations.push(data);
+          console.log('Book recommendation saved successfully');
+        } else {
+          console.error('Error saving book recommendation:', error);
         }
       }
 
+      console.log('Final recommendations generated:', recommendations.length);
       return recommendations;
     } catch (error) {
       console.error("Error generating full recommendation:", error);

@@ -1,8 +1,10 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { RefreshCw, Heart, User, LogOut, Star } from "lucide-react";
+import { RefreshCw, Heart, User, LogOut, Star, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { generateMockRecommendations } from "@/services/recommendations";
+import { enhancedRecommendationsService } from "@/services/enhancedRecommendations";
+import { toggleFavorite } from "@/services/recommendations";
 import { Recommendation } from "@/types/Recommendation";
 
 const ResultsPage = () => {
@@ -12,14 +14,14 @@ const ResultsPage = () => {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
 
   // Get data from navigation state
   const { contentType, answers, questions } = location.state || {};
 
   useEffect(() => {
     // Redirect if no data
-    if (!contentType || !answers) {
+    if (!contentType || !answers || !user) {
       navigate("/content-selection");
       return;
     }
@@ -28,20 +30,33 @@ const ResultsPage = () => {
     const loadRecommendations = async () => {
       try {
         setLoading(true);
-        // Simulate API delay
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        setError(null);
+        
+        console.log('Starting recommendation generation for user:', user.id);
+        
+        const questionnaireData = {
+          answers,
+          contentType,
+          userAge: user.age
+        };
 
-        const recs = await generateMockRecommendations(contentType);
+        const recs = await enhancedRecommendationsService.retryRecommendation(
+          questionnaireData,
+          user.id
+        );
+        
+        console.log('Recommendations generated successfully:', recs);
         setRecommendations(recs);
       } catch (error) {
         console.error("Error generating recommendations:", error);
+        setError("Failed to generate recommendations. Please try again.");
       } finally {
         setLoading(false);
       }
     };
 
     loadRecommendations();
-  }, [contentType, answers, navigate]);
+  }, [contentType, answers, user, navigate]);
 
   const handleLogoClick = () => {
     navigate("/");
@@ -60,17 +75,31 @@ const ResultsPage = () => {
     navigate("/history");
   };
 
-  const toggleFavorite = (recommendationId: string) => {
-    const newFavorites = new Set(favorites);
-    if (newFavorites.has(recommendationId)) {
-      newFavorites.delete(recommendationId);
-    } else {
-      newFavorites.add(recommendationId);
+  const handleToggleFavorite = async (recommendationId: string) => {
+    try {
+      const { error } = await toggleFavorite(recommendationId);
+      if (!error) {
+        // Update local state
+        setRecommendations(recs =>
+          recs.map(rec =>
+            rec.id === recommendationId
+              ? { ...rec, is_favorited: !rec.is_favorited }
+              : rec
+          )
+        );
+      } else {
+        console.error('Error toggling favorite:', error);
+      }
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
     }
-    setFavorites(newFavorites);
   };
 
-  if (!contentType || !answers) {
+  const handleRetry = () => {
+    window.location.reload();
+  };
+
+  if (!contentType || !answers || !user) {
     return null; // Redirect will happen in useEffect
   }
 
@@ -100,14 +129,72 @@ const ResultsPage = () => {
         {/* Loading Content */}
         <main className="flex flex-col items-center justify-center px-6 pt-[120px] pb-[100px]">
           <div className="text-center">
-            <RefreshCw className="w-16 h-16 text-appAccent animate-spin mx-auto mb-8" />
+            <Loader2 className="w-16 h-16 text-appAccent animate-spin mx-auto mb-8" />
             <h1 className="text-3xl md:text-4xl font-bold text-textPrimary mb-4">
               Generating Your Recommendations
             </h1>
-            <p className="text-lg text-textSecondary">
+            <p className="text-lg text-textSecondary mb-4">
               Our AI is analyzing your preferences to find the perfect{" "}
-              {contentType} for you...
+              {contentType === 'both' ? 'movie and book' : contentType} for you...
             </p>
+            <div className="text-sm text-textTertiary">
+              This may take up to 30 seconds
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-appPrimary text-textPrimary font-inter min-h-screen">
+        {/* Header */}
+        <header className="h-[72px] flex items-center justify-between px-6 md:px-12 bg-appPrimary">
+          <button
+            onClick={handleLogoClick}
+            className="text-textPrimary text-xl font-medium cursor-pointer hover:opacity-80 transition-opacity duration-200"
+          >
+            Smart Advisor
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-appAccent rounded-full flex items-center justify-center">
+              <span className="text-white text-sm font-medium">
+                {user?.name.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <span className="text-textSecondary text-[15px]">
+              Hi, {user?.name}
+            </span>
+          </div>
+        </header>
+
+        {/* Error Content */}
+        <main className="flex flex-col items-center justify-center px-6 pt-[120px] pb-[100px]">
+          <div className="text-center max-w-md">
+            <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-8">
+              <span className="text-white text-2xl">!</span>
+            </div>
+            <h1 className="text-3xl md:text-4xl font-bold text-textPrimary mb-4">
+              Oops! Something went wrong
+            </h1>
+            <p className="text-lg text-textSecondary mb-8">
+              {error}
+            </p>
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={handleRetry}
+                className="bg-appAccent text-white px-6 py-3 rounded-lg hover:bg-opacity-90 transition-all duration-200"
+              >
+                Try Again
+              </button>
+              <button
+                onClick={() => navigate('/questionnaire', { state: { contentType } })}
+                className="bg-appSecondary border border-gray-700 text-textPrimary px-6 py-3 rounded-lg hover:bg-gray-600 transition-all duration-200"
+              >
+                Retake Quiz
+              </button>
+            </div>
           </div>
         </main>
       </div>
@@ -191,12 +278,15 @@ const ResultsPage = () => {
                     src={rec.poster_url}
                     alt={rec.title}
                     className="w-full h-full object-cover rounded-lg"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                    }}
                   />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-textTertiary">
-                    No Image
-                  </div>
-                )}
+                ) : null}
+                <div className={`w-full h-full flex items-center justify-center text-textTertiary ${rec.poster_url ? 'hidden' : ''}`}>
+                  No Image
+                </div>
               </div>
 
               {/* Content */}
@@ -219,16 +309,16 @@ const ResultsPage = () => {
                     )}
                   </div>
                   <button
-                    onClick={() => toggleFavorite(rec.id)}
+                    onClick={() => handleToggleFavorite(rec.id)}
                     className={`p-2 rounded-full transition-colors duration-200 ${
-                      favorites.has(rec.id)
+                      rec.is_favorited
                         ? "bg-red-500 text-white"
                         : "bg-gray-700 text-textSecondary hover:text-red-500"
                     }`}
                   >
                     <Heart
                       size={20}
-                      fill={favorites.has(rec.id) ? "currentColor" : "none"}
+                      fill={rec.is_favorited ? "currentColor" : "none"}
                     />
                   </button>
                 </div>
@@ -255,11 +345,6 @@ const ResultsPage = () => {
                       </span>
                     ))}
                   </div>
-                )}
-
-                {/* Description */}
-                {rec.explanation && (
-                  <p className="text-textSecondary mb-4">{rec.explanation}</p>
                 )}
 
                 {/* AI Explanation */}
