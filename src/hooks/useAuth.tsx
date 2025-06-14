@@ -1,3 +1,4 @@
+
 import {
   useState,
   useEffect,
@@ -45,12 +46,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const initializeAuth = async () => {
       try {
-        // Only set loading true if we're actually checking auth state
-        if (session) {
-          setLoading(true);
-        }
+        console.log('Initializing auth state...');
         setError(null);
 
+        // Set up auth state listener first
+        const {
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange(async (event, session) => {
+          console.log('Auth state changed:', event, session?.user?.id);
+          
+          if (!mounted) return;
+
+          setSession(session);
+
+          if (session?.user) {
+            // Load user profile when we have a session
+            try {
+              const { user: profileUser, error: profileError } = await authService.getCurrentUser();
+              if (profileError) {
+                console.error('Error loading user profile:', profileError);
+                setError(profileError);
+                setUser(null);
+              } else {
+                setUser(profileUser);
+              }
+            } catch (err) {
+              console.error('Unexpected error loading profile:', err);
+              setUser(null);
+            }
+          } else {
+            setUser(null);
+          }
+          
+          setLoading(false);
+        });
+
+        // Check for existing session
         const {
           data: { session: initialSession },
           error: sessionError,
@@ -65,14 +96,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
-        if (initialSession) {
-          setSession(initialSession);
-          await loadUserProfile(initialSession.user.id);
-        } else {
-          setUser(null);
-          setSession(null);
+        console.log('Initial session:', initialSession?.user?.id || 'none');
+
+        // The onAuthStateChange listener will handle the session
+        if (!initialSession) {
           setLoading(false);
         }
+
+        return () => {
+          subscription.unsubscribe();
+        };
       } catch (err) {
         console.error("Unexpected error during initial auth setup:", err);
         const errorMessage =
@@ -86,78 +119,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     initializeAuth();
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-
-      // Only set loading true for sign in/up events
-      if (event === "SIGNED_IN") {
-        setLoading(true);
-      }
-
-      setSession(session);
-
-      if (session?.user) {
-        await loadUserProfile(session.user.id);
-      } else {
-        setUser(null);
-        setLoading(false);
-      }
-    });
-
     return () => {
       mounted = false;
-      subscription.unsubscribe();
     };
   }, []);
-
-  const loadUserProfile = async (userId: string) => {
-    try {
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
-
-      if (profileError) {
-        console.error("Error fetching profile:", profileError);
-        setError(profileError.message);
-        setUser(null);
-      } else if (profile) {
-        setUser({
-          id: userId,
-          email: profile.email || "",
-          name: profile.name,
-          age: profile.age,
-          created_at: profile.created_at,
-        });
-      } else {
-        // Profile not found, clear user data
-        setUser(null);
-        setError("User profile not found after login");
-      }
-    } catch (error) {
-      console.error("Error in loadUserProfile:", error);
-      setError("Failed to load user profile");
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const signIn = async (email: string, password: string) => {
     try {
       setLoading(true);
       setError(null);
+      console.log('Attempting signin...');
+      
       const result = await authService.signIn(email, password);
+      
       if (result.error) {
         setError(result.error);
+        console.error('Signin failed:', result.error);
       } else {
-        // On successful sign-in, session change listener will update user state
-        // No need to manually set user here, as onAuthStateChange handles it
+        console.log('Signin successful');
+        // Auth state change will be handled by the listener
       }
+      
       return result;
     } catch (error) {
       console.error("Error signing in:", error);
@@ -179,12 +161,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setLoading(true);
       setError(null);
+      console.log('Attempting signup...');
+      
       const result = await authService.signUp(email, password, name, age);
+      
       if (result.error) {
         setError(result.error);
+        console.error('Signup failed:', result.error);
       } else {
-        // On successful sign-up, session change listener will update user state
+        console.log('Signup successful');
+        // Auth state change will be handled by the listener
       }
+      
       return result;
     } catch (error) {
       console.error("Error signing up:", error);
@@ -201,13 +189,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setLoading(true);
       setError(null);
+      console.log('Attempting signout...');
+      
       const result = await authService.signOut();
+      
       if (result.error) {
         setError(result.error);
+        console.error('Signout failed:', result.error);
       } else {
+        console.log('Signout successful');
         setUser(null);
         setSession(null);
       }
+      
       return result;
     } catch (error) {
       console.error("Error signing out:", error);

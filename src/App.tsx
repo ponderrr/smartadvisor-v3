@@ -20,16 +20,41 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 5 * 60 * 1000, // 5 minutes
       retry: 2,
+      refetchOnWindowFocus: false,
+    },
+    mutations: {
+      retry: 1,
     },
   },
 });
 
 function App() {
   useEffect(() => {
+    // Validate required environment variables
+    const requiredEnvVars = {
+      VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
+      VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
+      VITE_OPENAI_API_KEY: import.meta.env.VITE_OPENAI_API_KEY,
+    };
+
+    const missing = Object.entries(requiredEnvVars)
+      .filter(([_, value]) => !value)
+      .map(([key]) => key);
+
+    if (missing.length > 0) {
+      console.error('Missing required environment variables:', missing);
+      if (import.meta.env.DEV) {
+        console.error('Please add these variables to your .env file:');
+        missing.forEach(key => console.error(`- ${key}`));
+      }
+    } else {
+      console.log('All required environment variables are configured');
+    }
+
+    // Additional validation
     const validation = validateEnvironment();
-    
     if (!validation.isValid && import.meta.env.DEV) {
-      console.warn('Missing environment variables:', validation.missingKeys);
+      console.warn('Some optional environment variables are missing:', validation.missingKeys);
     }
   }, []);
 
