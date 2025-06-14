@@ -1,12 +1,12 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Heart, Star, User, LogOut, Settings } from "lucide-react";
+import { Plus, Heart, Star, User, LogOut } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  getUserRecommendations,
-  toggleFavorite,
-} from "@/services/recommendations";
+import { databaseService, FilterOptions } from "@/services/database";
 import { Recommendation } from "@/types/Recommendation";
+import UserStatsCard from "@/components/account/UserStatsCard";
+import RecommendationFilters from "@/components/account/RecommendationFilters";
 
 const AccountHistoryPage = () => {
   const navigate = useNavigate();
@@ -14,14 +14,35 @@ const AccountHistoryPage = () => {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [filter, setFilter] = useState<
-    "all" | "movies" | "books" | "favorites"
-  >("all");
+  const [filter, setFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("newest");
 
   useEffect(() => {
     const loadRecommendations = async () => {
       try {
-        const { data, error } = await getUserRecommendations();
+        setLoading(true);
+        
+        // Build filter options
+        const filterOptions: FilterOptions = {
+          sortBy: sortBy as any,
+        };
+
+        // Apply content type filter
+        if (filter === "movies") {
+          filterOptions.contentType = "movie";
+        } else if (filter === "books") {
+          filterOptions.contentType = "book";
+        } else if (filter === "favorites") {
+          filterOptions.isFavorited = true;
+        } else if (filter === "thisMonth") {
+          const startOfMonth = new Date();
+          startOfMonth.setDate(1);
+          startOfMonth.setHours(0, 0, 0, 0);
+          filterOptions.startDate = startOfMonth;
+        }
+
+        const { data, error } = await databaseService.getUserRecommendations(filterOptions);
+        
         if (error) {
           console.error("Error loading recommendations:", error);
         } else {
@@ -35,7 +56,7 @@ const AccountHistoryPage = () => {
     };
 
     loadRecommendations();
-  }, []);
+  }, [filter, sortBy]);
 
   const handleLogoClick = () => {
     navigate("/");
@@ -52,7 +73,7 @@ const AccountHistoryPage = () => {
 
   const handleToggleFavorite = async (recommendationId: string) => {
     try {
-      const { error } = await toggleFavorite(recommendationId);
+      const { error } = await databaseService.toggleFavorite(recommendationId);
       if (!error) {
         // Update local state
         setRecommendations((recs) =>
@@ -68,18 +89,21 @@ const AccountHistoryPage = () => {
     }
   };
 
-  const filteredRecommendations = recommendations.filter((rec) => {
-    switch (filter) {
-      case "movies":
-        return rec.type === "movie";
-      case "books":
-        return rec.type === "book";
-      case "favorites":
-        return rec.is_favorited;
-      default:
-        return true;
+  const handleDeleteRecommendation = async (recommendationId: string) => {
+    if (!window.confirm("Are you sure you want to delete this recommendation?")) {
+      return;
     }
-  });
+
+    try {
+      const { error } = await databaseService.deleteRecommendation(recommendationId);
+      if (!error) {
+        // Remove from local state
+        setRecommendations((recs) => recs.filter((rec) => rec.id !== recommendationId));
+      }
+    } catch (error) {
+      console.error("Error deleting recommendation:", error);
+    }
+  };
 
   return (
     <div className="bg-appPrimary text-textPrimary font-inter min-h-screen">
@@ -141,27 +165,18 @@ const AccountHistoryPage = () => {
           </button>
         </div>
 
-        {/* Filter Tabs */}
-        <div className="flex gap-4 mb-8 overflow-x-auto">
-          {[
-            { key: "all", label: "All" },
-            { key: "movies", label: "Movies" },
-            { key: "books", label: "Books" },
-            { key: "favorites", label: "Favorites" },
-          ].map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setFilter(key as any)}
-              className={`px-6 py-2 rounded-full whitespace-nowrap transition-all duration-200 ${
-                filter === key
-                  ? "bg-appAccent text-white"
-                  : "bg-appSecondary text-textSecondary hover:text-textPrimary"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        {/* User Stats Card */}
+        <div className="mb-8">
+          <UserStatsCard />
         </div>
+
+        {/* Filter and Sort Controls */}
+        <RecommendationFilters
+          currentFilter={filter}
+          onFilterChange={setFilter}
+          sortBy={sortBy}
+          onSortChange={setSortBy}
+        />
 
         {/* Content */}
         {loading ? (
@@ -170,7 +185,7 @@ const AccountHistoryPage = () => {
               Loading your recommendations...
             </div>
           </div>
-        ) : filteredRecommendations.length === 0 ? (
+        ) : recommendations.length === 0 ? (
           <div className="text-center py-20">
             <div className="mb-4">
               <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -179,6 +194,8 @@ const AccountHistoryPage = () => {
               <h2 className="text-xl font-semibold text-textPrimary mb-2">
                 {filter === "favorites"
                   ? "No favorites yet"
+                  : filter === "thisMonth"
+                  ? "No recommendations this month"
                   : "No recommendations yet"}
               </h2>
               <p className="text-textSecondary mb-6">
@@ -196,7 +213,7 @@ const AccountHistoryPage = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredRecommendations.map((rec) => (
+            {recommendations.map((rec) => (
               <div
                 key={rec.id}
                 className="bg-appSecondary border border-gray-700 rounded-xl p-6 hover:border-appAccent transition-all duration-200"
@@ -276,9 +293,17 @@ const AccountHistoryPage = () => {
                   </div>
                 )}
 
-                {/* Date */}
-                <div className="text-xs text-textTertiary">
-                  Added {new Date(rec.created_at).toLocaleDateString()}
+                {/* Date and Actions */}
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-textTertiary">
+                    Added {new Date(rec.created_at).toLocaleDateString()}
+                  </div>
+                  <button
+                    onClick={() => handleDeleteRecommendation(rec.id)}
+                    className="text-xs text-red-500 hover:text-red-400 transition-colors duration-200"
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
             ))}
