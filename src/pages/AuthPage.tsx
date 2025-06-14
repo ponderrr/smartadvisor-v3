@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 interface SignInFormData {
@@ -18,12 +18,12 @@ interface SignUpFormData {
 
 const AuthPage = () => {
   const navigate = useNavigate();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, loading, error: authError } = useAuth();
   const [isSignIn, setIsSignIn] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [signInData, setSignInData] = useState<SignInFormData>({
     email: "",
@@ -98,35 +98,49 @@ const AuthPage = () => {
     e.preventDefault();
     if (!validateSignIn()) return;
 
-    setIsLoading(true);
-    const result = await signIn(signInData.email, signInData.password);
+    setIsSubmitting(true);
+    setErrors({});
 
-    if (result.error) {
-      setErrors({ general: result.error });
-    } else {
-      navigate("/content-selection");
+    try {
+      const result = await signIn(signInData.email, signInData.password);
+
+      if (result.error) {
+        setErrors({ general: result.error });
+      } else {
+        navigate("/content-selection");
+      }
+    } catch (error) {
+      setErrors({ general: "An unexpected error occurred" });
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsLoading(false);
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateSignUp()) return;
 
-    setIsLoading(true);
-    const result = await signUp(
-      signUpData.email,
-      signUpData.password,
-      signUpData.fullName,
-      parseInt(signUpData.age)
-    );
+    setIsSubmitting(true);
+    setErrors({});
 
-    if (result.error) {
-      setErrors({ general: result.error });
-    } else {
-      navigate("/content-selection");
+    try {
+      const result = await signUp(
+        signUpData.email,
+        signUpData.password,
+        signUpData.fullName,
+        parseInt(signUpData.age)
+      );
+
+      if (result.error) {
+        setErrors({ general: result.error });
+      } else {
+        navigate("/content-selection");
+      }
+    } catch (error) {
+      setErrors({ general: "An unexpected error occurred" });
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsLoading(false);
   };
 
   const toggleForm = (showSignIn: boolean) => {
@@ -151,7 +165,7 @@ const AuthPage = () => {
 
       {/* Authentication Container */}
       <main className="flex items-center justify-center min-h-[calc(100vh-72px)] px-6">
-        <div className="w-full max-w-[420px] bg-appSecondary rounded-2xl border border-gray-700 p-8 md:p-12">
+        <div className="w-full max-w-md">
           {/* Form Toggle */}
           <div className="flex gap-6 mb-8">
             <button
@@ -177,9 +191,11 @@ const AuthPage = () => {
           </div>
 
           {/* Error Message */}
-          {errors.general && (
+          {(errors.general || authError) && (
             <div className="mb-6 p-4 bg-red-500 bg-opacity-10 border border-red-500 rounded-lg">
-              <p className="text-red-500 text-sm">{errors.general}</p>
+              <p className="text-red-500 text-sm">
+                {errors.general || authError}
+              </p>
             </div>
           )}
 
@@ -205,6 +221,7 @@ const AuthPage = () => {
                     errors.email ? "border-red-500" : "border-gray-700"
                   }`}
                   placeholder="Enter your email"
+                  disabled={isSubmitting}
                 />
                 {errors.email && (
                   <p className="text-red-500 text-xs mt-1">{errors.email}</p>
@@ -231,11 +248,13 @@ const AuthPage = () => {
                       errors.password ? "border-red-500" : "border-gray-700"
                     }`}
                     placeholder="Enter your password"
+                    disabled={isSubmitting}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-textTertiary hover:text-textSecondary transition-colors duration-200"
+                    disabled={isSubmitting}
                   >
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
@@ -248,10 +267,17 @@ const AuthPage = () => {
               {/* Sign In Button */}
               <button
                 type="submit"
-                disabled={isLoading}
-                className="w-full bg-appAccent text-white text-base font-semibold rounded-lg py-4 mt-8 hover:bg-opacity-90 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isSubmitting}
+                className="w-full bg-appAccent text-white text-base font-semibold rounded-lg py-4 mt-8 hover:bg-opacity-90 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {isLoading ? "Signing In..." : "Sign In"}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Signing In...
+                  </>
+                ) : (
+                  "Sign In"
+                )}
               </button>
 
               {/* Secondary Actions */}
@@ -259,6 +285,7 @@ const AuthPage = () => {
                 <button
                   type="button"
                   className="text-textSecondary text-sm hover:text-textPrimary transition-colors duration-200"
+                  disabled={isSubmitting}
                 >
                   Forgot password?
                 </button>
@@ -271,6 +298,7 @@ const AuthPage = () => {
                   type="button"
                   onClick={() => toggleForm(false)}
                   className="text-appAccent text-sm hover:underline transition-all duration-200"
+                  disabled={isSubmitting}
                 >
                   Sign up
                 </button>
@@ -300,6 +328,7 @@ const AuthPage = () => {
                     errors.fullName ? "border-red-500" : "border-gray-700"
                   }`}
                   placeholder="Enter your full name"
+                  disabled={isSubmitting}
                 />
                 {errors.fullName && (
                   <p className="text-red-500 text-xs mt-1">{errors.fullName}</p>
@@ -325,6 +354,7 @@ const AuthPage = () => {
                     errors.email ? "border-red-500" : "border-gray-700"
                   }`}
                   placeholder="Enter your email"
+                  disabled={isSubmitting}
                 />
                 {errors.email && (
                   <p className="text-red-500 text-xs mt-1">{errors.email}</p>
@@ -351,6 +381,7 @@ const AuthPage = () => {
                   }`}
                   placeholder="18"
                   min="13"
+                  disabled={isSubmitting}
                 />
                 <p className="text-textTertiary text-xs mt-1">
                   Required for age-appropriate recommendations
@@ -380,11 +411,13 @@ const AuthPage = () => {
                       errors.password ? "border-red-500" : "border-gray-700"
                     }`}
                     placeholder="Enter your password"
+                    disabled={isSubmitting}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-textTertiary hover:text-textSecondary transition-colors duration-200"
+                    disabled={isSubmitting}
                   >
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
@@ -419,11 +452,13 @@ const AuthPage = () => {
                         : "border-gray-700"
                     }`}
                     placeholder="Confirm your password"
+                    disabled={isSubmitting}
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-textTertiary hover:text-textSecondary transition-colors duration-200"
+                    disabled={isSubmitting}
                   >
                     {showConfirmPassword ? (
                       <EyeOff size={20} />
@@ -442,10 +477,17 @@ const AuthPage = () => {
               {/* Sign Up Button */}
               <button
                 type="submit"
-                disabled={isLoading}
-                className="w-full bg-appAccent text-white text-base font-semibold rounded-lg py-4 mt-8 hover:bg-opacity-90 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isSubmitting}
+                className="w-full bg-appAccent text-white text-base font-semibold rounded-lg py-4 mt-8 hover:bg-opacity-90 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {isLoading ? "Creating Account..." : "Create Account"}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Creating Account...
+                  </>
+                ) : (
+                  "Create Account"
+                )}
               </button>
 
               {/* Secondary Actions */}
@@ -457,6 +499,7 @@ const AuthPage = () => {
                   type="button"
                   onClick={() => toggleForm(true)}
                   className="text-appAccent text-sm hover:underline transition-all duration-200"
+                  disabled={isSubmitting}
                 >
                   Sign in
                 </button>

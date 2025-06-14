@@ -1,20 +1,27 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, ArrowRight, Loader2, User, LogOut } from 'lucide-react';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
+import { ArrowLeft, ArrowRight, Loader2, User, LogOut } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { generateQuestionsWithRetry } from "@/services/openai";
 import { Question } from "@/types/Question";
 import { Answer } from "@/types/Answer";
+import { v4 as uuidv4 } from "uuid";
 
 const QuestionnairePage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, signOut } = useAuth();
-  
+
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -35,12 +42,12 @@ const QuestionnairePage = () => {
       try {
         setIsLoading(true);
         setError(null);
-        
+
         const generatedQuestions = await generateQuestionsWithRetry(
           contentType,
           user.age
         );
-        
+
         setQuestions(generatedQuestions);
       } catch (err) {
         setError("Failed to generate questions. Please try again.");
@@ -62,18 +69,21 @@ const QuestionnairePage = () => {
   };
 
   const currentQuestion = questions[currentQuestionIndex];
-  const progress = questions.length > 0 ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0;
+  const progress =
+    questions.length > 0
+      ? ((currentQuestionIndex + 1) / questions.length) * 100
+      : 0;
 
   const handleAnswer = (answer: string) => {
-    setAnswers(prev => ({
+    setAnswers((prev) => ({
       ...prev,
-      [currentQuestion.id]: answer
+      [currentQuestion.id]: answer,
     }));
   };
 
   const handleNext = () => {
     if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(prev => prev + 1);
+      setCurrentQuestionIndex((prev) => prev + 1);
     } else {
       handleComplete();
     }
@@ -81,7 +91,7 @@ const QuestionnairePage = () => {
 
   const handlePrevious = () => {
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev - 1);
+      setCurrentQuestionIndex((prev) => prev - 1);
     } else {
       navigate("/content-selection");
     }
@@ -91,11 +101,13 @@ const QuestionnairePage = () => {
     if (!user) return;
 
     setIsSubmitting(true);
-    
-    const formattedAnswers: Answer[] = questions.map(q => ({
+
+    const formattedAnswers: Answer[] = questions.map((q) => ({
+      id: uuidv4(),
       question_id: q.id,
       answer_text: answers[q.id] || "",
       user_id: user.id,
+      created_at: new Date().toISOString(),
     }));
 
     navigate("/results", {
@@ -107,7 +119,8 @@ const QuestionnairePage = () => {
     });
   };
 
-  const canProceed = currentQuestion && answers[currentQuestion.id]?.trim().length > 0;
+  const canProceed =
+    currentQuestion && answers[currentQuestion.id]?.trim().length > 0;
 
   if (isLoading) {
     return (
@@ -133,7 +146,7 @@ const QuestionnairePage = () => {
                 Hi, {user?.name}
               </span>
             </button>
-            
+
             {showUserMenu && (
               <div className="absolute right-0 top-full mt-2 w-48 bg-appSecondary border border-gray-700 rounded-lg shadow-lg z-50">
                 <button
@@ -194,7 +207,7 @@ const QuestionnairePage = () => {
                 Hi, {user?.name}
               </span>
             </button>
-            
+
             {showUserMenu && (
               <div className="absolute right-0 top-full mt-2 w-48 bg-appSecondary border border-gray-700 rounded-lg shadow-lg z-50">
                 <button
@@ -215,14 +228,14 @@ const QuestionnairePage = () => {
             )}
           </div>
         </header>
-        
+
         <main className="flex flex-col items-center justify-center px-6 pt-[120px]">
           <div className="text-center max-w-md">
             <h2 className="text-2xl font-semibold text-textPrimary mb-4">
               Oops! Something went wrong
             </h2>
             <p className="text-textSecondary mb-6">{error}</p>
-            <Button 
+            <Button
               onClick={() => window.location.reload()}
               className="bg-appAccent hover:bg-opacity-90"
             >
@@ -257,7 +270,7 @@ const QuestionnairePage = () => {
               Hi, {user?.name}
             </span>
           </button>
-          
+
           {showUserMenu && (
             <div className="absolute right-0 top-full mt-2 w-48 bg-appSecondary border border-gray-700 rounded-lg shadow-lg z-50">
               <button
@@ -299,12 +312,13 @@ const QuestionnairePage = () => {
                 {currentQuestion.text}
               </CardTitle>
               <CardDescription className="text-textSecondary">
-                Take your time to think about your answer. The more details you provide, the better we can tailor our recommendation.
+                Take your time to think about your answer. The more details you
+                provide, the better we can tailor our recommendation.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Textarea
-                value={answers[currentQuestion.id] || ''}
+                value={answers[currentQuestion.id] || ""}
                 onChange={(e) => handleAnswer(e.target.value)}
                 placeholder="Share your thoughts..."
                 className="min-h-32 resize-none bg-appPrimary border-gray-600 text-textPrimary"
@@ -332,7 +346,9 @@ const QuestionnairePage = () => {
               ) : (
                 <>
                   <span>
-                    {currentQuestionIndex === questions.length - 1 ? 'Get Recommendations' : 'Next'}
+                    {currentQuestionIndex === questions.length - 1
+                      ? "Get Recommendations"
+                      : "Next"}
                   </span>
                   <ArrowRight className="w-4 h-4" />
                 </>
