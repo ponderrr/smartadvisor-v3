@@ -1,3 +1,4 @@
+
 import { generateRecommendations } from "@/services/openai";
 import { tmdbService } from "@/services/tmdb";
 import { googleBooksService } from "@/services/googleBooks";
@@ -57,9 +58,12 @@ class EnhancedRecommendationsService {
       console.log('AI recommendations generated:', aiRecommendations);
     }
 
+    // Ensure aiRecommendations is an array
+    const recommendationsArray = Array.isArray(aiRecommendations) ? aiRecommendations : [];
+
     // Enhance with external API data and save to database
     const enhancedRecommendations = await Promise.all(
-      aiRecommendations.map(async (rec) => {
+      recommendationsArray.map(async (rec) => {
         try {
           let enhancedRec = { ...rec };
 
@@ -70,11 +74,9 @@ class EnhancedRecommendationsService {
               if (tmdbData) {
                 enhancedRec = {
                   ...enhancedRec,
-                  poster_url: tmdbData.poster_url || rec.poster_url,
+                  poster_url: tmdbData.poster || rec.poster_url,
                   rating: tmdbData.rating || rec.rating,
-                  genres: tmdbData.genres || rec.genres,
                   year: tmdbData.year || rec.year,
-                  director: tmdbData.director || rec.director,
                 };
               }
             } catch (tmdbError) {
@@ -91,11 +93,9 @@ class EnhancedRecommendationsService {
               if (bookData) {
                 enhancedRec = {
                   ...enhancedRec,
-                  poster_url: bookData.cover_url || rec.poster_url,
+                  poster_url: bookData.cover || rec.poster_url,
                   rating: bookData.rating || rec.rating,
-                  genres: bookData.genres || rec.genres,
-                  year: bookData.published_year || rec.year,
-                  author: bookData.author || rec.author,
+                  year: bookData.year || rec.year,
                 };
               }
             } catch (bookError) {
