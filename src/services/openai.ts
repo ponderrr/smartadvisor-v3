@@ -1,3 +1,4 @@
+
 import OpenAI from "openai";
 import { Question } from "@/types/Question";
 import { Answer } from "@/types/Answer";
@@ -28,6 +29,11 @@ export interface BookRecommendation {
   explanation: string;
 }
 
+export interface RecommendationData {
+  movieRecommendation?: MovieRecommendation;
+  bookRecommendation?: BookRecommendation;
+}
+
 /**
  * Generates personalized recommendation questions using OpenAI
  */
@@ -35,6 +41,8 @@ export async function generateQuestions(
   contentType: "movie" | "book" | "both",
   userAge: number
 ): Promise<Question[]> {
+  console.log(`Generating questions for ${contentType}, age ${userAge}`);
+  
   try {
     const prompt = `Generate exactly 5 personalized recommendation questions for a ${userAge}-year-old user who wants ${contentType} recommendations. 
     
@@ -57,7 +65,7 @@ export async function generateQuestions(
     Generate 5 unique questions now as valid JSON object:`;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4o-mini",
       response_format: { type: "json_object" },
       messages: [
         {
@@ -105,6 +113,7 @@ export async function generateQuestions(
       })
     );
 
+    console.log("Successfully generated questions:", formattedQuestions);
     return formattedQuestions;
   } catch (error) {
     console.error("Error generating questions:", error);
@@ -119,10 +128,9 @@ export async function generateRecommendations(
   answers: Answer[],
   contentType: "movie" | "book" | "both",
   userAge: number
-): Promise<{
-  movieRecommendation?: MovieRecommendation;
-  bookRecommendation?: BookRecommendation;
-}> {
+): Promise<RecommendationData> {
+  console.log(`Generating recommendations for ${contentType}, age ${userAge}`);
+  
   try {
     const answersText = answers
       .map((a, i) => `Q${i + 1}: ${a.answer_text}`)
@@ -169,7 +177,7 @@ ${
 Generate personalized recommendations now:`;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4o-mini",
       response_format: { type: "json_object" },
       messages: [
         {
@@ -215,6 +223,7 @@ Generate personalized recommendations now:`;
       throw new Error("Missing book recommendation");
     }
 
+    console.log("Successfully generated recommendations:", recommendations);
     return recommendations;
   } catch (error) {
     console.error("Error generating recommendations:", error);
@@ -237,10 +246,11 @@ export async function generateQuestionsWithRetry(
       return await generateQuestions(contentType, userAge);
     } catch (error) {
       lastError = error;
-      console.error(`Attempt ${attempt} failed:`, error);
+      console.error(`Question generation attempt ${attempt} failed:`, error);
 
       if (attempt < maxRetries) {
         const delay = Math.pow(2, attempt) * 1000;
+        console.log(`Retrying in ${delay}ms...`);
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
@@ -257,10 +267,7 @@ export async function generateRecommendationsWithRetry(
   contentType: "movie" | "book" | "both",
   userAge: number,
   maxRetries: number = 3
-): Promise<{
-  movieRecommendation?: MovieRecommendation;
-  bookRecommendation?: BookRecommendation;
-}> {
+): Promise<RecommendationData> {
   let lastError;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -268,10 +275,11 @@ export async function generateRecommendationsWithRetry(
       return await generateRecommendations(answers, contentType, userAge);
     } catch (error) {
       lastError = error;
-      console.error(`Attempt ${attempt} failed:`, error);
+      console.error(`Recommendation generation attempt ${attempt} failed:`, error);
 
       if (attempt < maxRetries) {
         const delay = Math.pow(2, attempt) * 1000;
+        console.log(`Retrying in ${delay}ms...`);
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }

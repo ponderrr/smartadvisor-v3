@@ -25,17 +25,24 @@ class EnhancedRecommendationsService {
   ): Promise<Recommendation[]> {
     const { answers, contentType, userAge } = questionnaireData;
 
+    console.log("Generating AI recommendations for user:", userId);
+    console.log("Content type:", contentType, "User age:", userAge);
+
     const aiRecommendations = await generateRecommendationsWithRetry(
       answers,
       contentType,
       userAge
     );
 
+    console.log("AI recommendations received:", aiRecommendations);
+
     const recommendations: Recommendation[] = [];
 
     // Process movie recommendation
     if (aiRecommendations.movieRecommendation) {
       const movieRec = aiRecommendations.movieRecommendation;
+      console.log("Processing movie recommendation:", movieRec.title);
+      
       const tmdbData = await tmdbService.searchMovie(movieRec.title);
 
       const movieRecommendation: Omit<Recommendation, "id" | "created_at"> = {
@@ -58,13 +65,18 @@ class EnhancedRecommendationsService {
       );
 
       if (!error && data) {
+        console.log("Movie recommendation saved:", data.id);
         recommendations.push(data);
+      } else {
+        console.error("Error saving movie recommendation:", error);
       }
     }
 
     // Process book recommendation
     if (aiRecommendations.bookRecommendation) {
       const bookRec = aiRecommendations.bookRecommendation;
+      console.log("Processing book recommendation:", bookRec.title);
+      
       const booksData = await googleBooksService.searchBook(
         bookRec.title,
         bookRec.author
@@ -90,15 +102,19 @@ class EnhancedRecommendationsService {
       );
 
       if (!error && data) {
+        console.log("Book recommendation saved:", data.id);
         recommendations.push(data);
+      } else {
+        console.error("Error saving book recommendation:", error);
       }
     }
 
+    console.log("Total recommendations generated:", recommendations.length);
     return recommendations;
   }
 
   /**
-   * Retry mechanism for recommendation generation
+   * Retry mechanism for recommendation generation with exponential backoff
    */
   async retryRecommendation(
     questionnaireData: QuestionnaireData,
@@ -109,13 +125,17 @@ class EnhancedRecommendationsService {
 
     for (let i = 0; i < retryCount; i++) {
       try {
+        console.log(`Recommendation generation attempt ${i + 1} of ${retryCount}`);
         return await this.generateFullRecommendation(questionnaireData, userId);
       } catch (error) {
         lastError = error;
+        console.error(`Attempt ${i + 1} failed:`, error);
 
         if (i < retryCount - 1) {
+          const delay = Math.pow(2, i) * 1000;
+          console.log(`Retrying in ${delay}ms...`);
           await new Promise((resolve) =>
-            setTimeout(resolve, Math.pow(2, i) * 1000)
+            setTimeout(resolve, delay)
           );
         }
       }

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -10,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, ArrowRight, Loader2, User, LogOut } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, User, LogOut, RefreshCw } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { generateQuestionsWithRetry } from "@/services/openai";
 import { Question } from "@/types/Question";
@@ -38,26 +39,29 @@ const QuestionnairePage = () => {
       return;
     }
 
-    const loadQuestions = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        const generatedQuestions = await generateQuestionsWithRetry(
-          contentType,
-          user.age
-        );
-
-        setQuestions(generatedQuestions);
-      } catch (err) {
-        setError("Failed to generate questions. Please try again.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     loadQuestions();
   }, [contentType, user, navigate]);
+
+  const loadQuestions = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      console.log("Loading AI-generated questions...");
+
+      const generatedQuestions = await generateQuestionsWithRetry(
+        contentType,
+        user.age
+      );
+
+      console.log("Questions loaded successfully:", generatedQuestions);
+      setQuestions(generatedQuestions);
+    } catch (err) {
+      console.error("Failed to load questions:", err);
+      setError("Failed to generate personalized questions. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleLogoClick = () => {
     navigate("/");
@@ -66,6 +70,10 @@ const QuestionnairePage = () => {
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
+  };
+
+  const handleRetry = () => {
+    loadQuestions();
   };
 
   const currentQuestion = questions[currentQuestionIndex];
@@ -174,8 +182,11 @@ const QuestionnairePage = () => {
               Generating Your Questions...
             </h2>
             <p className="text-textSecondary">
-              Our AI is creating personalized questions just for you.
+              Our AI is creating personalized questions just for you based on your preferences.
             </p>
+            <div className="text-sm text-textTertiary mt-2">
+              This usually takes 3-5 seconds
+            </div>
           </div>
         </main>
       </div>
@@ -230,16 +241,29 @@ const QuestionnairePage = () => {
 
         <main className="flex flex-col items-center justify-center px-6 pt-[120px]">
           <div className="text-center max-w-md">
+            <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-8">
+              <span className="text-white text-2xl">!</span>
+            </div>
             <h2 className="text-2xl font-semibold text-textPrimary mb-4">
-              Oops! Something went wrong
+              Unable to Generate Questions
             </h2>
             <p className="text-textSecondary mb-6">{error}</p>
-            <Button
-              onClick={() => window.location.reload()}
-              className="bg-appAccent hover:bg-opacity-90"
-            >
-              Try Again
-            </Button>
+            <div className="flex gap-4 justify-center">
+              <Button
+                onClick={handleRetry}
+                className="bg-appAccent hover:bg-opacity-90 flex items-center gap-2"
+              >
+                <RefreshCw size={16} />
+                Try Again
+              </Button>
+              <Button
+                onClick={() => navigate("/content-selection")}
+                variant="outline"
+                className="border-gray-600 text-textSecondary hover:text-textPrimary"
+              >
+                Go Back
+              </Button>
+            </div>
           </div>
         </main>
       </div>

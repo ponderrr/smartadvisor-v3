@@ -15,6 +15,7 @@ const ResultsPage = () => {
   const [loading, setLoading] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [generationStep, setGenerationStep] = useState<string>("Analyzing your answers...");
 
   // Get data from navigation state
   const { contentType, answers, questions } = location.state || {};
@@ -27,36 +28,48 @@ const ResultsPage = () => {
     }
 
     // Generate recommendations
-    const loadRecommendations = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        console.log('Starting recommendation generation for user:', user.id);
-        
-        const questionnaireData = {
-          answers,
-          contentType,
-          userAge: user.age
-        };
-
-        const recs = await enhancedRecommendationsService.retryRecommendation(
-          questionnaireData,
-          user.id
-        );
-        
-        console.log('Recommendations generated successfully:', recs);
-        setRecommendations(recs);
-      } catch (error) {
-        console.error("Error generating recommendations:", error);
-        setError("Failed to generate recommendations. Please try again.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadRecommendations();
   }, [contentType, answers, user, navigate]);
+
+  const loadRecommendations = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('Starting AI recommendation generation for user:', user.id);
+      
+      // Update generation steps for better UX
+      setGenerationStep("Analyzing your answers...");
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setGenerationStep("Generating personalized recommendations...");
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setGenerationStep("Enhancing with movie and book data...");
+      
+      const questionnaireData = {
+        answers,
+        contentType,
+        userAge: user.age
+      };
+
+      const recs = await enhancedRecommendationsService.retryRecommendation(
+        questionnaireData,
+        user.id
+      );
+      
+      setGenerationStep("Finalizing your recommendations...");
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      console.log('Recommendations generated successfully:', recs);
+      setRecommendations(recs);
+    } catch (error) {
+      console.error("Error generating recommendations:", error);
+      setError("Failed to generate personalized recommendations. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogoClick = () => {
     navigate("/");
@@ -96,7 +109,7 @@ const ResultsPage = () => {
   };
 
   const handleRetry = () => {
-    window.location.reload();
+    loadRecommendations();
   };
 
   if (!contentType || !answers || !user) {
@@ -131,14 +144,14 @@ const ResultsPage = () => {
           <div className="text-center">
             <Loader2 className="w-16 h-16 text-appAccent animate-spin mx-auto mb-8" />
             <h1 className="text-3xl md:text-4xl font-bold text-textPrimary mb-4">
-              Generating Your Recommendations
+              Creating Your Recommendations
             </h1>
             <p className="text-lg text-textSecondary mb-4">
-              Our AI is analyzing your preferences to find the perfect{" "}
-              {contentType === 'both' ? 'movie and book' : contentType} for you...
+              {generationStep}
             </p>
             <div className="text-sm text-textTertiary">
-              This may take up to 30 seconds
+              Our AI is analyzing your preferences to find the perfect{" "}
+              {contentType === 'both' ? 'movie and book' : contentType} for you
             </div>
           </div>
         </main>
@@ -176,7 +189,7 @@ const ResultsPage = () => {
               <span className="text-white text-2xl">!</span>
             </div>
             <h1 className="text-3xl md:text-4xl font-bold text-textPrimary mb-4">
-              Oops! Something went wrong
+              Recommendation Generation Failed
             </h1>
             <p className="text-lg text-textSecondary mb-8">
               {error}
@@ -184,8 +197,9 @@ const ResultsPage = () => {
             <div className="flex gap-4 justify-center">
               <button
                 onClick={handleRetry}
-                className="bg-appAccent text-white px-6 py-3 rounded-lg hover:bg-opacity-90 transition-all duration-200"
+                className="bg-appAccent text-white px-6 py-3 rounded-lg hover:bg-opacity-90 transition-all duration-200 flex items-center gap-2"
               >
+                <RefreshCw size={16} />
                 Try Again
               </button>
               <button
@@ -257,10 +271,10 @@ const ResultsPage = () => {
         {/* Title */}
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold text-textPrimary mb-4">
-            Your Personalized Recommendations
+            Your AI-Generated Recommendations
           </h1>
           <p className="text-lg text-textSecondary">
-            Based on your preferences, here's what we think you'll love
+            Based on your personalized answers, here's what our AI recommends
           </p>
         </div>
 
@@ -351,7 +365,7 @@ const ResultsPage = () => {
                 {rec.explanation && (
                   <div className="bg-appPrimary border border-gray-600 rounded-lg p-4">
                     <h3 className="text-textPrimary font-semibold mb-2">
-                      Why we recommend this:
+                      Why our AI recommends this:
                     </h3>
                     <p className="text-textSecondary">{rec.explanation}</p>
                   </div>

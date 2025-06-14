@@ -30,31 +30,47 @@ const queryClient = new QueryClient({
 
 function App() {
   useEffect(() => {
-    // Validate required environment variables
-    const requiredEnvVars = {
+    // Validate critical environment variables for core functionality
+    const criticalEnvVars = {
       VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
       VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
       VITE_OPENAI_API_KEY: import.meta.env.VITE_OPENAI_API_KEY,
     };
 
-    const missing = Object.entries(requiredEnvVars)
+    const missingCritical = Object.entries(criticalEnvVars)
       .filter(([_, value]) => !value)
       .map(([key]) => key);
 
-    if (missing.length > 0) {
-      console.error('Missing required environment variables:', missing);
+    if (missingCritical.length > 0) {
+      console.error('CRITICAL: Missing required environment variables:', missingCritical);
       if (import.meta.env.DEV) {
-        console.error('Please add these variables to your .env file:');
-        missing.forEach(key => console.error(`- ${key}`));
+        console.error('The app cannot function without these variables. Please add them to your .env file:');
+        missingCritical.forEach(key => console.error(`- ${key}`));
       }
-    } else {
-      console.log('All required environment variables are configured');
+      // Throw error for critical missing variables
+      throw new Error(`Missing critical environment variables: ${missingCritical.join(', ')}`);
     }
 
-    // Additional validation
+    console.log('✅ All critical environment variables are configured');
+
+    // Check optional environment variables
+    const optionalEnvVars = {
+      VITE_TMDB_API_KEY: import.meta.env.VITE_TMDB_API_KEY,
+      VITE_GOOGLE_BOOKS_API_KEY: import.meta.env.VITE_GOOGLE_BOOKS_API_KEY,
+    };
+
+    const missingOptional = Object.entries(optionalEnvVars)
+      .filter(([_, value]) => !value)
+      .map(([key]) => key);
+
+    if (missingOptional.length > 0 && import.meta.env.DEV) {
+      console.warn('⚠️ Optional environment variables missing (enhanced features may be limited):', missingOptional);
+    }
+
+    // Additional comprehensive validation
     const validation = validateEnvironment();
     if (!validation.isValid && import.meta.env.DEV) {
-      console.warn('Some optional environment variables are missing:', validation.missingKeys);
+      console.warn('Environment validation warnings:', validation.warnings);
     }
   }, []);
 
