@@ -1,10 +1,10 @@
-
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/hooks/useAuth";
 import { validateEnvironment } from "@/utils/envValidation";
 import { useEffect } from "react";
+import { apiValidationService } from "@/services/apiValidation";
 
 import Index from "@/pages/Index";
 import AuthPage from "@/pages/AuthPage";
@@ -52,6 +52,18 @@ function App() {
     }
 
     console.log('✅ All critical environment variables are configured');
+
+    // Validate external API services
+    if (import.meta.env.DEV) {
+      apiValidationService.validateAllApis().then(results => {
+        apiValidationService.logValidationResults(results);
+        
+        const failedServices = results.filter(r => !r.isAvailable);
+        if (failedServices.length > 0) {
+          console.warn('⚠️ Some external API services may have issues. Enhanced features may be limited.');
+        }
+      });
+    }
 
     // Check optional environment variables
     const optionalEnvVars = {
