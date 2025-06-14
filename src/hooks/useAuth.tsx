@@ -93,7 +93,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!mounted) return;
 
       // Only set loading true for sign in/up events
-      if (event === "SIGNED_IN" || event === "SIGNED_UP") {
+      if (event === "SIGNED_IN") {
         setLoading(true);
       }
 
@@ -229,17 +229,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error("No user logged in");
       }
 
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({ name, age, updated_at: new Date().toISOString() })
-        .eq("id", user.id);
+      const result = await authService.updateProfile({ name, age });
 
-      if (updateError) {
-        throw updateError;
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setUser({ ...user, name, age });
       }
 
-      setUser({ ...user, name, age });
-      return { error: null };
+      return result;
     } catch (error) {
       console.error("Error updating profile:", error);
       const errorMessage =

@@ -49,8 +49,18 @@ class AuthService {
 
       if (profileError) {
         console.error("Error creating profile:", profileError);
-        // Attempt to delete the auth user if profile creation fails
-        await supabase.auth.admin.deleteUser(authData.user.id);
+        // Call backend endpoint to handle user deletion
+        try {
+          await fetch("/api/auth/delete-user", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ userId: authData.user.id }),
+          });
+        } catch (deleteError) {
+          console.error("Error calling delete user endpoint:", deleteError);
+        }
         return { error: "Failed to create user profile" };
       }
 

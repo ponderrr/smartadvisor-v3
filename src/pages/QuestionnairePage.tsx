@@ -106,7 +106,6 @@ const QuestionnairePage = () => {
       id: uuidv4(),
       question_id: q.id,
       answer_text: answers[q.id] || "",
-      user_id: user.id,
       created_at: new Date().toISOString(),
     }));
 

@@ -45,7 +45,7 @@ export async function generateQuestions(
       contentType === "both" ? "movies and books" : contentType
     } preferences
     - Help understand their taste, mood, and interests
-    - Return as JSON array with format: [{"id": "1", "text": "question text"}, {"id": "2", "text": "question text"}, ...]
+    - Return as JSON object with format: {"questions": [{"id": "1", "text": "question text"}, {"id": "2", "text": "question text"}, ...]}
     
     Examples of good questions:
     - "What's your favorite genre and what draws you to it?"
@@ -54,7 +54,7 @@ export async function generateQuestions(
       contentType === "both" ? "movie or book" : contentType
     } you absolutely loved and why"
     
-    Generate 5 unique questions now as valid JSON array:`;
+    Generate 5 unique questions now as valid JSON object:`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
@@ -81,10 +81,14 @@ export async function generateQuestions(
 
     let questions;
     try {
-      questions = JSON.parse(questionsText);
-      if (!Array.isArray(questions)) {
-        throw new Error("Invalid response format");
+      const parsedResponse = JSON.parse(questionsText);
+      if (
+        !parsedResponse.questions ||
+        !Array.isArray(parsedResponse.questions)
+      ) {
+        throw new Error("Invalid response format - missing questions array");
       }
+      questions = parsedResponse.questions;
     } catch (error) {
       console.error("Failed to parse OpenAI response:", error);
       throw new Error("Invalid response format from OpenAI");
