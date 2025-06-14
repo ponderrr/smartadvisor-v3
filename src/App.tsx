@@ -1,3 +1,4 @@
+
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
@@ -5,6 +6,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { validateEnvironment } from "@/utils/envValidation";
 import { useEffect } from "react";
 import { apiValidationService } from "@/services/apiValidation";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 import Index from "@/pages/Index";
 import AuthPage from "@/pages/AuthPage";
@@ -42,8 +44,8 @@ function App() {
       .map(([key]) => key);
 
     if (missingCritical.length > 0) {
-      console.error('CRITICAL: Missing required environment variables:', missingCritical);
       if (import.meta.env.DEV) {
+        console.error('CRITICAL: Missing required environment variables:', missingCritical);
         console.error('The app cannot function without these variables. Please add them to your .env file:');
         missingCritical.forEach(key => console.error(`- ${key}`));
       }
@@ -51,9 +53,11 @@ function App() {
       throw new Error(`Missing critical environment variables: ${missingCritical.join(', ')}`);
     }
 
-    console.log('✅ All critical environment variables are configured');
+    if (import.meta.env.DEV) {
+      console.log('✅ All critical environment variables are configured');
+    }
 
-    // Validate external API services
+    // Validate external API services only in development
     if (import.meta.env.DEV) {
       apiValidationService.validateAllApis().then(results => {
         apiValidationService.logValidationResults(results);
@@ -65,18 +69,20 @@ function App() {
       });
     }
 
-    // Check optional environment variables
-    const optionalEnvVars = {
-      VITE_TMDB_API_KEY: import.meta.env.VITE_TMDB_API_KEY,
-      VITE_GOOGLE_BOOKS_API_KEY: import.meta.env.VITE_GOOGLE_BOOKS_API_KEY,
-    };
+    // Check optional environment variables only in development
+    if (import.meta.env.DEV) {
+      const optionalEnvVars = {
+        VITE_TMDB_API_KEY: import.meta.env.VITE_TMDB_API_KEY,
+        VITE_GOOGLE_BOOKS_API_KEY: import.meta.env.VITE_GOOGLE_BOOKS_API_KEY,
+      };
 
-    const missingOptional = Object.entries(optionalEnvVars)
-      .filter(([_, value]) => !value)
-      .map(([key]) => key);
+      const missingOptional = Object.entries(optionalEnvVars)
+        .filter(([_, value]) => !value)
+        .map(([key]) => key);
 
-    if (missingOptional.length > 0 && import.meta.env.DEV) {
-      console.warn('⚠️ Optional environment variables missing (enhanced features may be limited):', missingOptional);
+      if (missingOptional.length > 0) {
+        console.warn('⚠️ Optional environment variables missing (enhanced features may be limited):', missingOptional);
+      }
     }
 
     // Additional comprehensive validation
@@ -87,52 +93,54 @@ function App() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Router>
-          <div className="min-h-screen bg-background font-sans antialiased">
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/auth" element={<AuthPage />} />
-              <Route
-                path="/content-selection"
-                element={
-                  <ProtectedRoute>
-                    <ContentSelectionPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/questionnaire"
-                element={
-                  <ProtectedRoute>
-                    <QuestionnairePage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/results"
-                element={
-                  <ProtectedRoute>
-                    <ResultsPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/history"
-                element={
-                  <ProtectedRoute>
-                    <AccountHistoryPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </div>
-          <Toaster />
-        </Router>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <Router>
+            <div className="min-h-screen bg-background font-sans antialiased">
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/auth" element={<AuthPage />} />
+                <Route
+                  path="/content-selection"
+                  element={
+                    <ProtectedRoute>
+                      <ContentSelectionPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/questionnaire"
+                  element={
+                    <ProtectedRoute>
+                      <QuestionnairePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/results"
+                  element={
+                    <ProtectedRoute>
+                      <ResultsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/history"
+                  element={
+                    <ProtectedRoute>
+                      <AccountHistoryPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </div>
+            <Toaster />
+          </Router>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

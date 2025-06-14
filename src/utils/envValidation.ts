@@ -1,3 +1,4 @@
+
 export interface EnvValidationResult {
   isValid: boolean;
   missingKeys: string[];
@@ -7,7 +8,7 @@ export interface EnvValidationResult {
 export const validateEnvironment = (): EnvValidationResult => {
   const requiredKeys = [
     "VITE_OPENAI_API_KEY",
-    "VITE_TMDB_API_KEY",
+    "VITE_TMDB_API_KEY", 
     "VITE_GOOGLE_BOOKS_API_KEY",
     "VITE_SUPABASE_URL",
     "VITE_SUPABASE_ANON_KEY",
@@ -24,12 +25,12 @@ export const validateEnvironment = (): EnvValidationResult => {
     );
   }
 
-  // Log warnings to console in development
+  // Only log warnings in development mode
   if (import.meta.env.DEV && warnings.length > 0) {
     console.warn("Environment validation warnings:");
     warnings.forEach((warning) => console.warn(`- ${warning}`));
     console.warn(
-      "Please check your .env.local file and ensure all API keys are set."
+      "Please check your .env file and ensure all API keys are set."
     );
   }
 

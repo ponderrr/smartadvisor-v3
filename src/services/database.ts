@@ -147,7 +147,7 @@ class DatabaseService {
         query = query.range(filters.offset, (filters.offset + (filters.limit || 20)) - 1);
       }
 
-      const { data, error } = await supabase.auth.getUser();
+      const { data, error } = await query;
 
       if (error) {
         console.error("Error fetching recommendations:", error);
@@ -155,7 +155,7 @@ class DatabaseService {
       }
 
       // Convert database records to Recommendation type
-      const recommendations: Recommendation[] = (data as any[])?.map((rec: any) => ({
+      const recommendations: Recommendation[] = (data || []).map((rec: any) => ({
         id: rec.id,
         user_id: rec.user_id,
         type: rec.type,
@@ -171,7 +171,7 @@ class DatabaseService {
         content_type: rec.content_type,
         created_at: rec.created_at,
         description: rec.description,
-      })) || [];
+      }));
 
       return { data: recommendations, error: null };
     } catch (err) {
@@ -336,6 +336,7 @@ class DatabaseService {
         name: profile.name,
         age: profile.age,
         email: profile.email || user.email || "",
+        created_at: profile.created_at || new Date().toISOString(),
       };
 
       return { data: userData, error: null };

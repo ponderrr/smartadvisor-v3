@@ -1,193 +1,138 @@
-
+import { generateRecommendations } from "@/services/openai";
+import { tmdbService } from "@/services/tmdb";
+import { googleBooksService } from "@/services/googleBooks";
+import { databaseService } from "@/services/database";
 import { Recommendation } from "@/types/Recommendation";
-import { Answer } from "@/types/Answer";
-import { generateRecommendationsWithRetry } from "./openai";
-import { tmdbService } from "./tmdb";
-import { googleBooksService } from "./googleBooks";
-import { recommendationsService } from "./recommendations";
 
-export interface QuestionnaireData {
-  answers: Answer[];
+interface QuestionnaireData {
+  answers: any[];
   contentType: "movie" | "book" | "both";
   userAge: number;
 }
 
-/**
- * Enhanced recommendations service that combines AI generation with external data enrichment
- */
 class EnhancedRecommendationsService {
-  /**
-   * Generates complete recommendations with AI + external data enrichment
-   */
-  async generateFullRecommendation(
-    questionnaireData: QuestionnaireData,
+  private readonly MAX_RETRIES = 2;
+  private readonly RETRY_DELAY = 1000;
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async retryRecommendation(
+    questionnaireData: any,
+    userId: string,
+    retryCount = 0
+  ): Promise<Recommendation[]> {
+    try {
+      const recommendations = await this.generateEnhancedRecommendations(questionnaireData, userId);
+      return recommendations;
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error(`Recommendation generation attempt ${retryCount + 1} failed:`, error);
+      }
+      
+      if (retryCount < this.MAX_RETRIES) {
+        await this.delay(this.RETRY_DELAY * (retryCount + 1));
+        return this.retryRecommendation(questionnaireData, userId, retryCount + 1);
+      }
+      
+      throw new Error(`Failed to generate recommendations after ${this.MAX_RETRIES + 1} attempts`);
+    }
+  }
+
+  async generateEnhancedRecommendations(
+    questionnaireData: any,
     userId: string
   ): Promise<Recommendation[]> {
     const { answers, contentType, userAge } = questionnaireData;
 
-    console.log("🎯 Starting enhanced recommendation generation");
-    console.log("📝 Parameters:", { contentType, userAge, answersCount: answers.length });
+    if (import.meta.env.DEV) {
+      console.log('Starting enhanced recommendation generation:', { contentType, userAge });
+    }
 
-    try {
-      // Step 1: Generate AI recommendations
-      console.log("🤖 Generating AI recommendations...");
-      const aiRecommendations = await generateRecommendationsWithRetry(
-        answers,
-        contentType,
-        userAge
-      );
+    // Generate base recommendations using OpenAI
+    const aiRecommendations = await generateRecommendations(answers, contentType, userAge);
+    
+    if (import.meta.env.DEV) {
+      console.log('AI recommendations generated:', aiRecommendations);
+    }
 
-      console.log("✅ AI recommendations received:", aiRecommendations);
-
-      const recommendations: Recommendation[] = [];
-
-      // Step 2: Process movie recommendation with TMDB enhancement
-      if (aiRecommendations.movieRecommendation) {
-        const movieRec = aiRecommendations.movieRecommendation;
-        console.log("🎬 Enhancing movie recommendation:", movieRec.title);
-        
+    // Enhance with external API data and save to database
+    const enhancedRecommendations = await Promise.all(
+      aiRecommendations.map(async (rec) => {
         try {
-          const tmdbData = await tmdbService.searchMovie(movieRec.title);
-          
-          const movieRecommendation: Omit<Recommendation, "id" | "created_at"> = {
-            user_id: userId,
-            type: "movie",
-            title: movieRec.title,
-            director: movieRec.director,
-            author: undefined,
-            year: tmdbData.year || movieRec.year,
-            rating: tmdbData.rating || 7.5,
-            genres: movieRec.genres,
-            poster_url: tmdbData.poster,
-            explanation: movieRec.explanation,
-            is_favorited: false,
-            content_type: contentType,
-          };
+          let enhancedRec = { ...rec };
 
-          const { data, error } = await recommendationsService.saveRecommendation(
-            movieRecommendation
-          );
-
-          if (!error && data) {
-            console.log("✅ Movie recommendation saved successfully:", data.id);
-            recommendations.push(data);
-          } else {
-            console.error("❌ Error saving movie recommendation:", error);
-            throw new Error(`Failed to save movie recommendation: ${error}`);
+          // Enhance movies with TMDB data
+          if (rec.type === 'movie') {
+            try {
+              const tmdbData = await tmdbService.searchMovie(rec.title);
+              if (tmdbData) {
+                enhancedRec = {
+                  ...enhancedRec,
+                  poster_url: tmdbData.poster_url || rec.poster_url,
+                  rating: tmdbData.rating || rec.rating,
+                  genres: tmdbData.genres || rec.genres,
+                  year: tmdbData.year || rec.year,
+                  director: tmdbData.director || rec.director,
+                };
+              }
+            } catch (tmdbError) {
+              if (import.meta.env.DEV) {
+                console.warn('TMDB enhancement failed for:', rec.title, tmdbError);
+              }
+            }
           }
-        } catch (error) {
-          console.error("❌ Error processing movie recommendation:", error);
-          throw error;
-        }
-      }
 
-      // Step 3: Process book recommendation with Google Books enhancement
-      if (aiRecommendations.bookRecommendation) {
-        const bookRec = aiRecommendations.bookRecommendation;
-        console.log("📚 Enhancing book recommendation:", bookRec.title);
-        
-        try {
-          const booksData = await googleBooksService.searchBook(
-            bookRec.title,
-            bookRec.author
-          );
-
-          const bookRecommendation: Omit<Recommendation, "id" | "created_at"> = {
-            user_id: userId,
-            type: "book",
-            title: bookRec.title,
-            director: undefined,
-            author: bookRec.author,
-            year: booksData.year || bookRec.year,
-            rating: booksData.rating || 4.2,
-            genres: bookRec.genres,
-            poster_url: booksData.cover,
-            explanation: bookRec.explanation,
-            is_favorited: false,
-            content_type: contentType,
-          };
-
-          const { data, error } = await recommendationsService.saveRecommendation(
-            bookRecommendation
-          );
-
-          if (!error && data) {
-            console.log("✅ Book recommendation saved successfully:", data.id);
-            recommendations.push(data);
-          } else {
-            console.error("❌ Error saving book recommendation:", error);
-            throw new Error(`Failed to save book recommendation: ${error}`);
+          // Enhance books with Google Books data
+          if (rec.type === 'book') {
+            try {
+              const bookData = await googleBooksService.searchBook(rec.title, rec.author);
+              if (bookData) {
+                enhancedRec = {
+                  ...enhancedRec,
+                  poster_url: bookData.cover_url || rec.poster_url,
+                  rating: bookData.rating || rec.rating,
+                  genres: bookData.genres || rec.genres,
+                  year: bookData.published_year || rec.year,
+                  author: bookData.author || rec.author,
+                };
+              }
+            } catch (bookError) {
+              if (import.meta.env.DEV) {
+                console.warn('Google Books enhancement failed for:', rec.title, bookError);
+              }
+            }
           }
+
+          // Save to database
+          const { data: savedRec, error } = await databaseService.saveRecommendation({
+            ...enhancedRec,
+            user_id: userId,
+          });
+
+          if (error) {
+            if (import.meta.env.DEV) {
+              console.error('Failed to save recommendation:', error);
+            }
+            return enhancedRec; // Return enhanced but unsaved recommendation
+          }
+
+          return savedRec || enhancedRec;
         } catch (error) {
-          console.error("❌ Error processing book recommendation:", error);
-          throw error;
+          if (import.meta.env.DEV) {
+            console.error('Error enhancing recommendation:', error);
+          }
+          return rec; // Return original recommendation if enhancement fails
         }
-      }
+      })
+    );
 
-      console.log("🎉 Enhanced recommendation generation completed");
-      console.log("📊 Total recommendations generated:", recommendations.length);
-      
-      return recommendations;
-    } catch (error) {
-      console.error("💥 Enhanced recommendation generation failed:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * Retry mechanism for recommendation generation with exponential backoff
-   */
-  async retryRecommendation(
-    questionnaireData: QuestionnaireData,
-    userId: string,
-    retryCount = 3
-  ): Promise<Recommendation[]> {
-    let lastError;
-
-    for (let i = 0; i < retryCount; i++) {
-      try {
-        console.log(`🔄 Recommendation generation attempt ${i + 1} of ${retryCount}`);
-        return await this.generateFullRecommendation(questionnaireData, userId);
-      } catch (error) {
-        lastError = error;
-        console.error(`❌ Attempt ${i + 1} failed:`, error);
-
-        if (i < retryCount - 1) {
-          const delay = Math.pow(2, i) * 1000;
-          console.log(`⏳ Retrying in ${delay}ms...`);
-          await new Promise((resolve) =>
-            setTimeout(resolve, delay)
-          );
-        }
-      }
+    if (import.meta.env.DEV) {
+      console.log('Enhanced recommendations completed:', enhancedRecommendations.length);
     }
 
-    console.error("💥 All retry attempts exhausted");
-    throw lastError;
-  }
-
-  /**
-   * Validate API keys and environment setup
-   */
-  validateApiSetup(): { isValid: boolean; warnings: string[] } {
-    const warnings: string[] = [];
-    
-    if (!import.meta.env.VITE_TMDB_API_KEY) {
-      warnings.push("TMDB API key missing - movie posters will use fallback images");
-    }
-    
-    if (!import.meta.env.VITE_GOOGLE_BOOKS_API_KEY) {
-      warnings.push("Google Books API key missing - book covers will use fallback images");
-    }
-    
-    if (!import.meta.env.VITE_OPENAI_API_KEY) {
-      warnings.push("OpenAI API key missing - recommendation generation will fail");
-    }
-
-    return {
-      isValid: warnings.length === 0,
-      warnings
-    };
+    return enhancedRecommendations;
   }
 }
 
