@@ -1,4 +1,3 @@
-
 import {
   useState,
   useEffect,
@@ -41,44 +40,61 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // New function to handle user profile fetching
+  const fetchUserProfile = async (supabaseUser: SupabaseUser) => {
+    try {
+      setLoading(true);
+      setError(null);
+      console.log(
+        "useAuth: fetchUserProfile - attempting to get current user..."
+      );
+      const { user: profileUser, error: profileError } =
+        await authService.getCurrentUser();
+
+      if (profileError) {
+        console.error("useAuth: Error loading user profile:", profileError);
+        setError(profileError);
+        setUser(null);
+      } else {
+        setUser(profileUser);
+        console.log(
+          "useAuth: User profile loaded successfully.",
+          profileUser?.id
+        );
+      }
+    } catch (err) {
+      console.error("useAuth: Unexpected error loading profile:", err);
+      setUser(null);
+      setError("An unexpected error occurred while loading profile.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
 
     const initializeAuth = async () => {
       try {
-        console.log('Initializing auth state...');
+        console.log("Initializing auth state...");
         setError(null);
 
         // Set up auth state listener first
         const {
           data: { subscription },
         } = supabase.auth.onAuthStateChange(async (event, session) => {
-          console.log('Auth state changed:', event, session?.user?.id);
-          
+          console.log("Auth state changed:", event, session?.user?.id);
+
           if (!mounted) return;
 
           setSession(session);
 
-          if (session?.user) {
-            // Load user profile when we have a session
-            try {
-              const { user: profileUser, error: profileError } = await authService.getCurrentUser();
-              if (profileError) {
-                console.error('Error loading user profile:', profileError);
-                setError(profileError);
-                setUser(null);
-              } else {
-                setUser(profileUser);
-              }
-            } catch (err) {
-              console.error('Unexpected error loading profile:', err);
-              setUser(null);
-            }
-          } else {
+          // The fetchUserProfile useEffect will handle loading the user profile.
+          // We only set loading to false if there's no session user.
+          if (!session?.user) {
             setUser(null);
+            setLoading(false);
           }
-          
-          setLoading(false);
         });
 
         // Check for existing session
@@ -96,10 +112,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
-        console.log('Initial session:', initialSession?.user?.id || 'none');
+        console.log("Initial session:", initialSession?.user?.id || "none");
 
-        // The onAuthStateChange listener will handle the session
-        if (!initialSession) {
+        // If there's an initial session with a user, fetch their profile immediately
+        if (initialSession?.user) {
+          fetchUserProfile(initialSession.user);
+        } else {
           setLoading(false);
         }
 
@@ -124,22 +142,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
+  // useEffect to fetch user profile whenever the session user changes
+  useEffect(() => {
+    if (session?.user) {
+      fetchUserProfile(session.user);
+    } else if (session === null) {
+      // If session becomes explicitly null, ensure user is null and loading is false
+      setUser(null);
+      setLoading(false);
+    }
+  }, [session?.user]);
+
   const signIn = async (email: string, password: string) => {
     try {
       setLoading(true);
       setError(null);
-      console.log('Attempting signin...');
-      
+      console.log("Attempting signin...");
+
       const result = await authService.signIn(email, password);
-      
+
       if (result.error) {
         setError(result.error);
-        console.error('Signin failed:', result.error);
+        console.error("Signin failed:", result.error);
       } else {
-        console.log('Signin successful');
-        // Auth state change will be handled by the listener
+        console.log("Signin successful");
+        // Auth state change will be handled by the listener and subsequent useEffect for profile fetch
       }
-      
+
       return result;
     } catch (error) {
       console.error("Error signing in:", error);
@@ -147,8 +176,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         error instanceof Error ? error.message : "An unexpected error occurred";
       setError(errorMessage);
       return { error: errorMessage };
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -161,18 +188,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setLoading(true);
       setError(null);
-      console.log('Attempting signup...');
-      
+      console.log("Attempting signup...");
+
       const result = await authService.signUp(email, password, name, age);
-      
+
       if (result.error) {
         setError(result.error);
-        console.error('Signup failed:', result.error);
+        console.error("Signup failed:", result.error);
       } else {
-        console.log('Signup successful');
-        // Auth state change will be handled by the listener
+        console.log("Signup successful");
+        // Auth state change will be handled by the listener and subsequent useEffect for profile fetch
       }
-      
+
       return result;
     } catch (error) {
       console.error("Error signing up:", error);
@@ -180,8 +207,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         error instanceof Error ? error.message : "An unexpected error occurred";
       setError(errorMessage);
       return { error: errorMessage };
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -189,19 +214,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setLoading(true);
       setError(null);
-      console.log('Attempting signout...');
-      
+      console.log("Attempting signout...");
+
       const result = await authService.signOut();
-      
+
       if (result.error) {
         setError(result.error);
-        console.error('Signout failed:', result.error);
+        console.error("Signout failed:", result.error);
       } else {
-        console.log('Signout successful');
+        console.log("Signout successful");
         setUser(null);
         setSession(null);
+        setLoading(false); // Explicitly set loading to false on sign out
       }
-      
+
       return result;
     } catch (error) {
       console.error("Error signing out:", error);
@@ -209,8 +235,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         error instanceof Error ? error.message : "An unexpected error occurred";
       setError(errorMessage);
       return { error: errorMessage };
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -238,8 +262,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         error instanceof Error ? error.message : "An unexpected error occurred";
       setError(errorMessage);
       return { error: errorMessage };
-    } finally {
-      setLoading(false);
     }
   };
 

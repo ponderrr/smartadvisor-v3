@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,12 +18,29 @@ interface SignUpFormData {
 
 const AuthPage = () => {
   const navigate = useNavigate();
-  const { signIn, signUp, loading, error: authError } = useAuth();
+  const {
+    signIn,
+    signUp,
+    loading,
+    error: authError,
+    user,
+    session,
+  } = useAuth();
   const [isSignIn, setIsSignIn] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    console.log("AuthPage useEffect - user:", user);
+    console.log("AuthPage useEffect - session:", session);
+    console.log("AuthPage useEffect - loading:", loading);
+    if (user && session && !loading) {
+      console.log("AuthPage: User, session, and not loading. Navigating...");
+      navigate("/content-selection");
+    }
+  }, [user, session, loading, navigate]);
 
   const [signInData, setSignInData] = useState<SignInFormData>({
     email: "",
@@ -107,7 +124,7 @@ const AuthPage = () => {
       if (result.error) {
         setErrors({ general: result.error });
       } else {
-        navigate("/content-selection");
+        // Redirection is now handled by the useEffect hook
       }
     } catch (error) {
       setErrors({ general: "An unexpected error occurred" });
@@ -134,7 +151,7 @@ const AuthPage = () => {
       if (result.error) {
         setErrors({ general: result.error });
       } else {
-        navigate("/content-selection");
+        // Redirection is now handled by the useEffect hook
       }
     } catch (error) {
       setErrors({ general: "An unexpected error occurred" });
