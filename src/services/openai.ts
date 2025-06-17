@@ -56,8 +56,15 @@ export async function generateQuestions(
     );
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Failed to generate questions");
+      const responseText = await response.text();
+      let errorMessage = "Failed to generate questions";
+      try {
+        const errorData = JSON.parse(responseText);
+        errorMessage = errorData.error || errorMessage;
+      } catch (e) {
+        errorMessage = `Failed to generate questions: ${responseText}`;
+      }
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
@@ -105,8 +112,15 @@ export async function generateRecommendations(
     );
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Failed to generate recommendations");
+      const responseText = await response.text();
+      let errorMessage = "Failed to generate recommendations";
+      try {
+        const errorData = JSON.parse(responseText);
+        errorMessage = errorData.error || errorMessage;
+      } catch (e) {
+        errorMessage = `Failed to generate recommendations: ${responseText}`;
+      }
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();

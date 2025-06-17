@@ -132,7 +132,12 @@ Generate personalized recommendations now:`;
       throw new Error("No response from OpenAI");
     }
 
-    const recommendations = JSON.parse(recommendationsText);
+    let recommendations;
+    try {
+      recommendations = JSON.parse(recommendationsText);
+    } catch (error) {
+      throw new Error("OpenAI returned invalid JSON");
+    }
 
     // Validate the response format
     if (

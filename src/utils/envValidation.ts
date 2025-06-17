@@ -5,10 +5,13 @@ export interface EnvValidationResult {
 }
 
 export const validateEnvironment = (): EnvValidationResult => {
+  // Cast import.meta.env to allow dynamic key access
+  const env = import.meta.env as Record<string, string | undefined>;
+
   // Only validate client-side environment variables
   const requiredClientKeys = ["VITE_SUPABASE_URL", "VITE_SUPABASE_ANON_KEY"];
 
-  const missingKeys = requiredClientKeys.filter((key) => !import.meta.env[key]);
+  const missingKeys = requiredClientKeys.filter((key) => !env[key]);
   const warnings: string[] = [];
 
   if (missingKeys.length > 0) {
@@ -22,16 +25,16 @@ export const validateEnvironment = (): EnvValidationResult => {
   // Check for accidentally exposed service keys (SECURITY CRITICAL)
   const exposedKeys = [];
 
-  if (import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY) {
+  if (env.VITE_SUPABASE_SERVICE_ROLE_KEY) {
     exposedKeys.push("VITE_SUPABASE_SERVICE_ROLE_KEY");
   }
-  if (import.meta.env.VITE_OPENAI_API_KEY) {
+  if (env.VITE_OPENAI_API_KEY) {
     exposedKeys.push("VITE_OPENAI_API_KEY");
   }
-  if (import.meta.env.VITE_TMDB_API_KEY) {
+  if (env.VITE_TMDB_API_KEY) {
     exposedKeys.push("VITE_TMDB_API_KEY");
   }
-  if (import.meta.env.VITE_GOOGLE_BOOKS_API_KEY) {
+  if (env.VITE_GOOGLE_BOOKS_API_KEY) {
     exposedKeys.push("VITE_GOOGLE_BOOKS_API_KEY");
   }
 
@@ -44,7 +47,7 @@ export const validateEnvironment = (): EnvValidationResult => {
   }
 
   // Only log warnings in development mode
-  if (import.meta.env.DEV && warnings.length > 0) {
+  if (env.DEV && warnings.length > 0) {
     console.warn("Environment validation warnings:");
     warnings.forEach((warning) => console.warn(`- ${warning}`));
   }
