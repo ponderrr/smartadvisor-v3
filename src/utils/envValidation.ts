@@ -1,4 +1,3 @@
-
 export interface EnvValidationResult {
   isValid: boolean;
   missingKeys: string[];
@@ -6,22 +5,41 @@ export interface EnvValidationResult {
 }
 
 export const validateEnvironment = (): EnvValidationResult => {
-  const requiredKeys = [
-    "VITE_OPENAI_API_KEY",
-    "VITE_TMDB_API_KEY", 
-    "VITE_GOOGLE_BOOKS_API_KEY",
-    "VITE_SUPABASE_URL",
-    "VITE_SUPABASE_ANON_KEY",
-  ];
+  // Only validate client-side environment variables
+  const requiredClientKeys = ["VITE_SUPABASE_URL", "VITE_SUPABASE_ANON_KEY"];
 
-  const missingKeys = requiredKeys.filter((key) => !import.meta.env[key]);
+  const missingKeys = requiredClientKeys.filter((key) => !import.meta.env[key]);
   const warnings: string[] = [];
 
   if (missingKeys.length > 0) {
     warnings.push(
-      `Missing environment variables: ${missingKeys.join(
+      `Missing required client environment variables: ${missingKeys.join(
         ", "
-      )}. Some features may not work properly.`
+      )}. The application cannot function without these.`
+    );
+  }
+
+  // Check for accidentally exposed service keys (SECURITY CRITICAL)
+  const exposedKeys = [];
+
+  if (import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY) {
+    exposedKeys.push("VITE_SUPABASE_SERVICE_ROLE_KEY");
+  }
+  if (import.meta.env.VITE_OPENAI_API_KEY) {
+    exposedKeys.push("VITE_OPENAI_API_KEY");
+  }
+  if (import.meta.env.VITE_TMDB_API_KEY) {
+    exposedKeys.push("VITE_TMDB_API_KEY");
+  }
+  if (import.meta.env.VITE_GOOGLE_BOOKS_API_KEY) {
+    exposedKeys.push("VITE_GOOGLE_BOOKS_API_KEY");
+  }
+
+  if (exposedKeys.length > 0) {
+    warnings.push(
+      `🚨 CRITICAL SECURITY VULNERABILITY: The following API keys are exposed in the client bundle: ${exposedKeys.join(
+        ", "
+      )}. Remove these immediately!`
     );
   }
 
@@ -29,9 +47,6 @@ export const validateEnvironment = (): EnvValidationResult => {
   if (import.meta.env.DEV && warnings.length > 0) {
     console.warn("Environment validation warnings:");
     warnings.forEach((warning) => console.warn(`- ${warning}`));
-    console.warn(
-      "Please check your .env file and ensure all API keys are set."
-    );
   }
 
   return {
